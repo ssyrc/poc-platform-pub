@@ -137,6 +137,37 @@ print_python_help() {
 EOF
 }
 
+# --- step 0.5: environment module ------------------------------------------
+# 이 host의 /apps/python 툴체인은 environment-modules의 module이 로드된 셸에서만
+# venv/pip 생성이 온전히 끝난다. 없으면 bin/activate가 빠진 반쪽 venv가 조용히
+# 만들어진다. systemd의 ExecStart=/usr/bin/env bash ... 는 로그인/인터랙티브
+# 셸이 아니라 ~/.bashrc 나 /etc/profile.d/modules.sh 를 자동으로 읽지 않으므로
+# 여기서 modules init을 직접 source한다.
+# MLPERF_ENV_MODULE="" 로 끄거나 다른 module명을 지정할 수 있다.
+MLPERF_ENV_MODULE="${MLPERF_ENV_MODULE-python-3.13.0}"
+
+if [[ -n "$MLPERF_ENV_MODULE" ]]; then
+  if ! command -v module >/dev/null 2>&1; then
+    for init in /usr/share/Modules/init/bash /usr/share/lmod/lmod/init/bash /etc/profile.d/modules.sh; do
+      if [[ -r "$init" ]]; then
+        # shellcheck disable=SC1090
+        source "$init" || true
+        break
+      fi
+    done
+  fi
+  if command -v module >/dev/null 2>&1; then
+    if module load "$MLPERF_ENV_MODULE" 2>/dev/null; then
+      ok "module loaded: $MLPERF_ENV_MODULE"
+    else
+      warn "module load failed (continuing): $MLPERF_ENV_MODULE"
+    fi
+  else
+    # module 시스템이 없는 로컬 개발 머신에서도 그냥 진행한다.
+    inf "environment-modules not available; skipping module load"
+  fi
+fi
+
 # --- step 1: detect Python -------------------------------------------------
 inf "platform dir:  $SCRIPT_DIR"
 inf "poc root:      $POC_PLATFORM_ROOT"
@@ -259,8 +290,17 @@ fi
 #   - recreate only if existing venv Python is too old
 RECREATE=0
 
-if [[ -d "$VENV" && -x "$VENV/bin/python" ]]; then
-  if ! py_version_ok "$VENV/bin/python"; then
+# 폴더는 있는데 bin/python 이 없거나 실행 불가하거나 bin/activate 가 빠진
+# 반쪽 venv도 반드시 잡아내야 한다. 예전 조건(-d && -x)은 그런 경우 아예 false가
+# 되어 RECREATE도 안 켜지고 재생성도 건너뛴 채 깨진 venv로 그대로 진행했다.
+if [[ -d "$VENV" ]]; then
+  if [[ ! -x "$VENV/bin/python" ]]; then
+    warn "existing venv has no usable python; recreating: $VENV"
+    RECREATE=1
+  elif [[ ! -f "$VENV/bin/activate" ]]; then
+    warn "existing venv is missing bin/activate; recreating: $VENV"
+    RECREATE=1
+  elif ! py_version_ok "$VENV/bin/python"; then
     warn "existing venv uses old Python ($(py_version_str "$VENV/bin/python")); recreating: $VENV"
     RECREATE=1
   else
@@ -279,6 +319,13 @@ fi
 
 if [[ ! -x "${VENV}/bin/python" ]]; then
   err "venv python not found: ${VENV}/bin/python"
+  exit 1
+fi
+
+if [[ ! -f "${VENV}/bin/activate" ]]; then
+  err "venv is incomplete (no bin/activate): ${VENV}"
+  err "the Python toolchain likely needs its environment module loaded first"
+  err "try: module load ${MLPERF_ENV_MODULE:-python-3.13.0} && rm -rf ${VENV} && $0"
   exit 1
 fi
 

@@ -128,8 +128,22 @@
     .recharts-tooltip-label { color: #c9c5d6 !important; font-weight: 600; }
 
     /* ---- v3.5 shell: left sidebar + content surface ---- */
-    .app-shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
-    @media (max-width: 1100px) { .app-shell { grid-template-columns: 76px 1fr; } }
+    /* --content-extra-w = 사이드바를 접었을 때 실제로 자유로워지는 폭
+       (248px 펼침 - 76px 접힘 = 172px). 탭 본문 maxWidth가 이만큼 늘어난다. */
+    .app-shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; --content-extra-w: 0px; }
+    .app-shell.sidebar-collapsed { grid-template-columns: 76px 1fr; --content-extra-w: 172px; }
+    @media (max-width: 1100px) { .app-shell { grid-template-columns: 76px 1fr; --content-extra-w: 172px; } }
+    .sidebar-collapse-btn { margin-left:auto; width:26px; height:26px; border-radius:999px; display:inline-grid;
+      place-items:center; border:1px solid #262433; background:rgba(255,255,255,.04); color:#8c8798; flex:none; }
+    .sidebar-collapse-btn:hover { color:#d7c4ff; border-color:rgba(187,134,252,.4); }
+    /* 접은 상태에서도 다시 펼칠 버튼은 남겨야 하므로 foot 전체가 아니라 info만 숨긴다. */
+    .app-shell.sidebar-collapsed .nav-item span.nav-label,
+    .app-shell.sidebar-collapsed .nav-sub,
+    .app-shell.sidebar-collapsed .nav-section-label,
+    .app-shell.sidebar-collapsed .sidebar-foot-info,
+    .app-shell.sidebar-collapsed .brand-text { display: none; }
+    .app-shell.sidebar-collapsed .nav-item { justify-content: center; padding: 9px 0; gap:0; }
+    .app-shell.sidebar-collapsed .nav-item.active::before { display:none; }
 
     .sidebar {
       position: sticky; top: 0; align-self: start; height: 100vh;
@@ -182,7 +196,7 @@
       margin: 16px 0 7px;
     }
     @media (max-width: 1100px) {
-      .nav-item span.nav-label, .nav-sub, .nav-section-label, .sidebar-foot, .brand-text { display: none; }
+      .nav-item span.nav-label, .nav-sub, .nav-section-label, .sidebar-foot-info, .brand-text { display: none; }
       .nav-item { justify-content: center; padding: 9px 0; gap:0; }
       .nav-item.active::before { display:none; }
     }
@@ -439,8 +453,13 @@
     @media (max-width:860px){ .config-main-grid{ grid-template-columns:1fr; } }
     .control-card, .summary-card { height:100%; }
     .control-card.is-hp { display:flex; flex-direction:column; gap:12px; }
-    .node-input-grid { display:grid; grid-template-columns:minmax(150px,.52fr) minmax(280px,1fr); gap:10px; align-items:end; }
+    .node-input-grid { display:grid; grid-template-columns:minmax(200px,.65fr) minmax(240px,1fr); gap:10px; align-items:end; width:100%; }
+    .pd-node-section .node-input-grid { grid-template-columns:minmax(0,.6fr) minmax(0,1fr); gap:8px; }
     @media (max-width:760px){ .node-input-grid{ grid-template-columns:1fr; } }
+    .node-host-input { border:1.5px solid #6a63a0 !important; background:#181630 !important;
+      box-shadow: inset 0 0 0 1px rgba(187,134,252,.06); }
+    .node-gpu-stepper { border:1.5px solid #6a63a0 !important; background:#181630 !important;
+      box-shadow: inset 0 0 0 1px rgba(187,134,252,.06); }
     .gpu-stepper { display:grid; grid-template-columns:30px minmax(0,1fr) 30px; gap:6px; align-items:center; border:1px solid #332f44; border-radius:12px; background:#0e0e13; padding:4px; }
     .gpu-stepper button { height:30px; border-radius:9px; background:#1c1b25; color:#c9c5d6; border:1px solid #262433; font-weight:500; }
     .gpu-stepper button:hover { background:#24222f; color:#03DAC6; border-color:rgba(3,218,198,.32); }
@@ -1067,8 +1086,100 @@
       width:34px; background:transparent; border:0; outline:0; text-align:center;
       color:#fff; font-weight:900; font-size:12px; font-variant-numeric:tabular-nums;
     }
-    .gpu-qty-with-probe { display:grid; grid-template-columns:112px minmax(168px,1fr); gap:8px; align-items:center; }
+    .gpu-qty-with-probe { display:grid; grid-template-columns:140px minmax(160px,1fr); gap:8px; align-items:center; }
+    /* PD 2단에서는 카드 폭이 ~250px까지 좁아져 스테퍼와 free 상태 칩을 한 줄에
+       넣으면 칩이 자기 최소폭(약 66px)을 못 받아 그리드가 넘친다. 세로로 쌓아
+       두 요소 모두 온전히 보이게 하고, fr 기반이라 행 전체 폭은 계속 컨테이너
+       100%(= "+ 노드 추가" 버튼 폭)와 정확히 일치한다. */
+    .pd-node-section .gpu-qty-with-probe { grid-template-columns:minmax(0,1fr); gap:6px; }
+    .pd-node-section .node-input-grid > * { min-width:0; }
     .gpu-probe-panel { display:flex; flex-wrap:wrap; gap:5px; align-items:center; min-height:34px; }
+    .gpu-probe-panel .muted, .gpu-probe-panel .checking,
+    .gpu-probe-chip {
+      display:inline-flex; align-items:center; min-height:26px; border-radius:999px;
+      padding:4px 8px; font-size:10.5px; font-weight:850; letter-spacing:.02em;
+      border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.04);
+      color:#a9a3b8; white-space:nowrap;
+    }
+    .gpu-probe-panel .checking { color:#03DAC6; border-color:rgba(3,218,198,.24); background:rgba(3,218,198,.08); }
+    .gpu-probe-chip.ok { color:#72f1b8; border-color:rgba(114,241,184,.28); background:rgba(114,241,184,.09); }
+    .gpu-probe-chip.warn { color:#ff9cac; border-color:rgba(207,102,121,.30); background:rgba(207,102,121,.10); }
+
+    .node-host-input { min-height:42px !important; max-height:64px !important; }
+    .node-inline-gpu-probe {
+      display:inline-flex; align-items:center; justify-content:center;
+      min-height:24px; border-radius:999px; padding:3px 7px;
+      font-size:10.5px; font-weight:900; letter-spacing:.01em; white-space:nowrap;
+      border:1px solid rgba(255,255,255,.08); background:rgba(255,255,255,.04); color:#b8b2c8;
+    }
+    .node-inline-gpu-probe.ok { color:#72f1b8; border-color:rgba(114,241,184,.28); background:rgba(114,241,184,.09); }
+    .node-inline-gpu-probe.warn { color:#ff9cac; border-color:rgba(207,102,121,.30); background:rgba(207,102,121,.10); }
+    @media (max-width:1100px){ .node-input-grid{ grid-template-columns:1fr !important; } }
+    @media (max-width:900px){ .gpu-qty-with-probe{ grid-template-columns:1fr; } .node-card-row.node-card-chip{ min-width:100%; } }
+
+
+    /* v6.0.6 — visible monitoring charts, separate log panel, clean status dots */
+    .monitor-log-grid {
+      display:grid;
+      grid-template-columns:minmax(0,1.28fr) minmax(360px,.72fr);
+      gap:16px;
+      align-items:stretch;
+    }
+    @media (max-width:1280px){ .monitor-log-grid{ grid-template-columns:1fr; } }
+    .monitor-panel {
+      height:auto !important;
+      max-height:none !important;
+      min-height:470px !important;
+      overflow:visible !important;
+    }
+    .monitor-panel.include-nic { min-height:720px !important; }
+    .monitor-panel .run-panel-body { overflow:visible !important; }
+    .monitor-chart-grid { flex:0 0 auto !important; }
+    .monitor-chart-grid > div {
+      min-height:286px !important;
+      display:flex !important;
+      flex-direction:column !important;
+    }
+    .monitor-chart-grid .gpu-chart-canvas { flex:1 1 auto !important; min-height:220px !important; }
+    .log-check-panel {
+      height:auto !important;
+      max-height:none !important;
+      min-height:470px !important;
+      overflow:hidden !important;
+    }
+    .monitor-panel.include-nic + .log-check-panel { min-height:720px !important; }
+    .log-check-body { min-height:0 !important; overflow:hidden !important; }
+    .log-check-panel .log-stream { flex:1 1 auto !important; min-height:0 !important; overflow:hidden !important; }
+    .log-actions {
+      display:flex;
+      justify-content:flex-end;
+      align-items:center;
+      gap:8px;
+      flex-wrap:wrap;
+      padding:10px;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      background:rgba(14,14,19,.52);
+      margin-top:10px;
+    }
+    .log-path-ready {
+      display:inline-flex; align-items:center; justify-content:center;
+      min-width:68px; padding:4px 9px; border-radius:999px;
+      font-size:10px; font-weight:900; letter-spacing:.12em; text-transform:uppercase;
+      color:#03DAC6; border:1px solid rgba(3,218,198,.30); background:rgba(3,218,198,.10);
+    }
+    .log-path-ready.muted { color:#9c97ad; border-color:#332f44; background:rgba(255,255,255,.04); }
+    .compact-result-panel, .run-history-card {
+      height:320px !important;
+      max-height:320px !important;
+      overflow:hidden !important;
+    }
+    .compact-result-panel .run-panel-body { overflow:hidden !important; }
+    .result-row-head {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:8px 12px; border-bottom:1px solid rgba(38,36,51,.58);
+      background:linear-gradient(90deg,rgba(187,134,252,.09),rgba(3,218,198,.04));
+    }
     .gpu-probe-panel .muted, .gpu-probe-panel .checking,
     .gpu-probe-chip {
       display:inline-flex; align-items:center; min-height:26px; border-radius:999px;
@@ -7663,35 +7774,13 @@ ${monitorHtml}
     );
   }
 
-  function Sidebar({ tab, setTab, dashboardSub, setDashboardSub, clusterSub, setClusterSub, trainingSub, setTrainingSub, inferenceSub, setInferenceSub, runningCount, testStatus = {}, onAckTestStatus }) {
+  function Sidebar({ tab, setTab, dashboardSub, setDashboardSub, clusterSub, setClusterSub, trainingSub, setTrainingSub, inferenceSub, setInferenceSub, runningCount, collapsed, setCollapsed }) {
     const statusLabel = (s) => {
       const v = String(s || "idle").toLowerCase();
       if (["running", "pending", "analyzing"].includes(v)) return "RUN";
       if (v === "success") return "OK";
       if (["failed", "error", "partial", "stopped"].includes(v)) return "ERR";
       return "IDLE";
-    };
-    const NavStatus = ({ id }) => {
-      const st = testStatus?.[id];
-      if (!st || !st.visible) return null;
-      const status = String(st.status || "idle").toLowerCase();
-      const cls = ["running", "pending", "analyzing"].includes(status)
-        ? "running"
-        : status === "success" ? "success" : "failed";
-      return (
-        <span
-          role="button"
-          tabIndex={0}
-          className={"nav-run-status " + cls}
-          title={st.terminal ? "클릭하면 상태 알림을 확인 처리합니다." : "테스트 실행 중"}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (st.terminal && onAckTestStatus) onAckTestStatus(st.run_id);
-          }}
-        >
-          <span className="nav-run-dot"></span>
-        </span>
-      );
     };
     const NavItem = ({ id, icon, label }) => {
       const handleClick = () => {
@@ -7705,7 +7794,6 @@ ${monitorHtml}
           onClick={handleClick} title={label}>
           <span className="nav-ico-wrap"><Icon name={icon} /></span>
           <span className="nav-label">{label}</span>
-          {(id === "training" || id === "inference") && <NavStatus id={id} />}
         </button>
       );
     };
@@ -7756,8 +7844,12 @@ ${monitorHtml}
         </nav>
 
         <div className="sidebar-foot px-4 py-3 border-t border-line flex items-center gap-2 text-[11px] font-mono text-fog-500">
-          <span className="dot bg-volt dot-pulse"></span>
-          <span>online · v6.67</span>
+          <span className="sidebar-foot-info flex items-center gap-2">
+            <span className="dot bg-volt dot-pulse"></span>
+            <span>online · v6.67</span>
+          </span>
+          <button className="sidebar-collapse-btn" title={collapsed ? "메뉴 펼치기" : "메뉴 접기"}
+                  onClick={() => setCollapsed((v) => !v)}>{collapsed ? "»" : "«"}</button>
         </div>
       </aside>
     );
@@ -10101,22 +10193,22 @@ function ClusterTab({ sub }) {
 
         <div className="node-bottom-controls">
           <div className="node-input-grid">
-            <BenchField label="hostname">
+            <BenchField label={<span style={{ color: "#f2f0f7", fontWeight: 700 }}>IP/hostname</span>}>
               <textarea
                 className="inp node-host-input font-mono resize-y"
                 rows="1"
                 value={hostText}
                 onChange={(e) => setHostText(e.target.value)}
                 spellCheck={false}
-                placeholder="gpu-node03 gpu-node04"
+                placeholder="gpu-node03 gpu-node04 또는 192.0.2.41"
                 onKeyDown={(e) => {
                   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") add();
                 }}
               />
             </BenchField>
-            <BenchField label="GPU 수량">
+            <BenchField label={<span style={{ color: "#f2f0f7", fontWeight: 700 }}>GPU 수량</span>}>
               <div className="gpu-qty-with-probe">
-                <div className="gpu-stepper">
+                <div className="gpu-stepper node-gpu-stepper">
                   <button type="button" onClick={() => bumpGpu(-1)}>-</button>
                   <input type="text" inputMode="numeric" value={normalizedGpu} onChange={(e) => setGpus(e.target.value.replace(/[^0-9]/g, ""))} />
                   <button type="button" onClick={() => bumpGpu(1)}>+</button>
@@ -11521,6 +11613,14 @@ function ClusterTab({ sub }) {
   function App() {
     const [tab, setTab] = useState("dashboard");
     const [dashboardSub, setDashboardSub] = useState("results");
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+      try { return window.localStorage.getItem("platform_sidebar_collapsed_v1") === "1"; }
+      catch (_) { return false; }
+    });
+    useEffect(() => {
+      try { window.localStorage.setItem("platform_sidebar_collapsed_v1", sidebarCollapsed ? "1" : "0"); }
+      catch (_) {}
+    }, [sidebarCollapsed]);
     const [clusterSub, setClusterSub] = useState("os");
     const [trainingSub, setTrainingSub] = useState("mlperf");
     const [inferenceSub, setInferenceSub] = useState("mlperf");
@@ -11596,15 +11696,6 @@ function ClusterTab({ sub }) {
     }, [pdArgs]);
 
     const [runs, setRuns] = useState([]);
-    const [dismissedRunNotices, setDismissedRunNotices] = useState(() => {
-      try { return JSON.parse(window.localStorage.getItem("platform_dismissed_run_notices_v1") || "[]"); }
-      catch (_) { return []; }
-    });
-    useEffect(() => {
-      try { window.localStorage.setItem("platform_dismissed_run_notices_v1", JSON.stringify(dismissedRunNotices.slice(-200))); }
-      catch (_) {}
-    }, [dismissedRunNotices]);
-
     // Per-tab run ID tracking. The active tab's runId is mirrored into
     // currentRunIdRaw which drives the existing useEffects (fetch, SSE).
     // When the user switches tabs, monitoring state is cleared and the
@@ -12090,40 +12181,6 @@ function ClusterTab({ sub }) {
     const hosts = displayRun.hosts || [];
 
     const terminalStatuses = new Set(["success", "failed", "partial", "stopped", "error"]);
-    const runningStatuses = new Set(["pending", "running", "analyzing"]);
-    const runBelongsToTestTab = (r, slot) => {
-      const k = r?.kind || "mlperf";
-      const suite = r?.suite || "";
-      if (slot === "training") return k === "mlperf_k8s" || (k === "mlperf" && suite === "training");
-      if (slot === "inference") return ["llmd_bench", "vllm_bench", "pd_bench"].includes(k) || (k === "mlperf" && suite === "inference");
-      return false;
-    };
-    const latestRunForSlot = (slot) => {
-      const currentBelongs = currentRun && runBelongsToTestTab(currentRun, slot) ? currentRun : null;
-      const latestListed = (runs || [])
-        .filter((r) => runBelongsToTestTab(r, slot))
-        .sort((a, b) => (b.created_at || 0) - (a.created_at || 0))[0] || null;
-      if (!currentBelongs) return latestListed;
-      if (!latestListed) return currentBelongs;
-      return (currentBelongs.created_at || 0) >= (latestListed.created_at || 0) ? currentBelongs : latestListed;
-    };
-    const buildTestStatus = (slot) => {
-      const r = latestRunForSlot(slot);
-      if (!r) return null;
-      const st = String(r.status || "idle").toLowerCase();
-      const terminal = terminalStatuses.has(st);
-      const visible = runningStatuses.has(st) || (terminal && !dismissedRunNotices.includes(r.run_id));
-      return { run_id: r.run_id, status: st, terminal, visible };
-    };
-    const testStatus = {
-      training: buildTestStatus("training"),
-      inference: buildTestStatus("inference"),
-    };
-    const onAckTestStatus = useCallback((runId) => {
-      if (!runId) return;
-      setDismissedRunNotices((prev) => prev.includes(runId) ? prev : [...prev, runId].slice(-200));
-    }, []);
-
     const runningCount = runs.filter((r) =>
       (["llmd_bench", "vllm_bench", "pd_bench", "mlperf_k8s", "mlperf"].includes(r.kind)) && !terminalStatuses.has(String(r.status || "").toLowerCase())
     ).length;
@@ -12160,8 +12217,8 @@ function ClusterTab({ sub }) {
     }[tab] || { title: "", sub: "" };
 
     return (
-      <div className="app-shell surface">
-        <Sidebar tab={tab} setTab={setTab} dashboardSub={dashboardSub} setDashboardSub={setDashboardSub} clusterSub={clusterSub} setClusterSub={setClusterSub} trainingSub={trainingSub} setTrainingSub={setTrainingSub} inferenceSub={inferenceSub} setInferenceSub={setInferenceSub} runningCount={runningCount} testStatus={testStatus} onAckTestStatus={onAckTestStatus} />
+      <div className={"app-shell surface" + (sidebarCollapsed ? " sidebar-collapsed" : "")}>
+        <Sidebar tab={tab} setTab={setTab} dashboardSub={dashboardSub} setDashboardSub={setDashboardSub} clusterSub={clusterSub} setClusterSub={setClusterSub} trainingSub={trainingSub} setTrainingSub={setTrainingSub} inferenceSub={inferenceSub} setInferenceSub={setInferenceSub} runningCount={runningCount} collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
 
         <div className="min-w-0 grid-bg">
           {/* CONTENT HEADER */}
@@ -12203,7 +12260,7 @@ function ClusterTab({ sub }) {
             {tab === "cluster" && <ClusterTab sub={clusterSub} />}
 
             {tab === "training" && (
-              <div className="space-y-4 fade-up max-w-[1600px] test-run-stack">
+              <div className="space-y-4 fade-up test-run-stack" style={{ maxWidth: "calc(1600px + var(--content-extra-w, 0px))" }}>
                 <div className="card"><div className="card-pad"><TrainingK8sConfigStable onStart={onStart} busy={busy} /></div></div>
 
                 <div className="monitor-log-grid">
@@ -12256,7 +12313,7 @@ function ClusterTab({ sub }) {
             )}
 
             {tab === "inference" && (
-              <div className="space-y-4 fade-up max-w-[1600px] test-run-stack">
+              <div className="space-y-4 fade-up test-run-stack" style={{ maxWidth: "calc(1600px + var(--content-extra-w, 0px))" }}>
                 <div className="card"><div className="card-pad">
                   {inferenceSub === "mlperf"
                     ? <InferenceMlperfConfigStable onStart={onStart} busy={busy} setInferenceSub={setInferenceSub} />
