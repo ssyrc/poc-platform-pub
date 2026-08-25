@@ -1,0 +1,27 @@
+# Local secrets / site-specific configuration
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Runtime state / logs
+.platform_state/
+.poc_platform_state/
+mlperf_logs_*/
+vllm_logs_*/
+llmd_logs_*/
+*.log
+
+# Local data and package caches
+data/
+files/
+wheelhouse/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

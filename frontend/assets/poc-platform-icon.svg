@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="PoC Bench Platform">
+  <defs>
+    <linearGradient id="bg" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7C4DFF"/>
+      <stop offset="0.55" stop-color="#3700B3"/>
+      <stop offset="1" stop-color="#03DAC6"/>
+    </linearGradient>
+    <linearGradient id="chip" x1="18" y1="18" x2="46" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.96"/>
+      <stop offset="1" stop-color="#D8C9FF" stop-opacity="0.92"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect x="4" y="4" width="56" height="56" rx="16" fill="#0A0A0E"/>
+  <rect x="7" y="7" width="50" height="50" rx="14" fill="url(#bg)" filter="url(#shadow)"/>
+  <path d="M20 24h24v16H20z" rx="4" fill="#0A0A0E" opacity="0.42"/>
+  <rect x="21" y="21" width="22" height="22" rx="6" fill="url(#chip)"/>
+  <path d="M29 28h7.2c3.2 0 5.2 1.8 5.2 4.7s-2 4.7-5.2 4.7H33v5.1h-4V28zm4 3.3v2.9h2.7c1.1 0 1.8-.5 1.8-1.5s-.7-1.4-1.8-1.4H33z" fill="#2A176B"/>
+  <g fill="#ECEAF2" opacity="0.95">
+    <circle cx="17" cy="18" r="2"/>
+    <circle cx="47" cy="18" r="2"/>
+    <circle cx="17" cy="46" r="2"/>
+    <circle cx="47" cy="46" r="2"/>
+  </g>
+  <g stroke="#ECEAF2" stroke-width="2" stroke-linecap="round" opacity="0.72">
+    <path d="M21 18h-4"/>
+    <path d="M47 18h-4"/>
+    <path d="M21 46h-4"/>
+    <path d="M47 46h-4"/>
+    <path d="M32 21v-5"/>
+    <path d="M32 48v-5"/>
+  </g>
+</svg>
