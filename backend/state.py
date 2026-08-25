@@ -430,6 +430,58 @@ class PlatformState:
             pass
         return clean
 
+    # --- generic JSON documents ---
+    # Whole-document stores (accelerator_perf, gpu_tco_table). Unlike dashboard
+    # pins these have no per-item identity to merge on, so the newest readable
+    # file wins and older deployment folders are only a fallback.
+
+    def _document_file(self, name: str) -> str:
+        return os.path.join(self.storage_dir, f"{name}.json")
+
+    def _candidate_document_files(self, name: str) -> List[str]:
+        candidates: List[str] = [
+            self._document_file(name),
+            os.path.join(LEGACY_STATE_DIR, f"{name}.json"),
+        ]
+        try:
+            parent = _PROJECT_PARENT_DIR
+            for entry in sorted(os.listdir(parent), reverse=True):
+                path = os.path.join(parent, entry, ".platform_state", f"{name}.json")
+                if entry.startswith("poc-platform-v") and path not in candidates:
+                    candidates.append(path)
+        except Exception:
+            pass
+        return candidates
+
+    def load_document(self, name: str, default: Any = None) -> Any:
+        for path in self._candidate_document_files(name):
+            try:
+                if not os.path.isfile(path):
+                    continue
+                with open(path, "r", encoding="utf-8") as f:
+                    payload = json.load(f)
+            except Exception:
+                continue
+            # Files written by persist_document are wrapped; a hand-placed file
+            # may be the bare document.
+            if isinstance(payload, dict) and "document" in payload:
+                return payload["document"]
+            return payload
+        return default
+
+    def persist_document(self, name: str, document: Any) -> Any:
+        path = self._document_file(name)
+        try:
+            os.makedirs(self.storage_dir, exist_ok=True)
+            payload = {"schema": 1, "saved_at": time.time(), "document": document}
+            tmp = f"{path}.tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+            os.replace(tmp, path)
+        except Exception:
+            pass
+        return document
+
     # --- runs ---
 
     def add_run(self, run: RunState) -> None:

@@ -51,6 +51,7 @@ from sse_starlette.sse import EventSourceResponse
 from . import cluster, gpu_monitor, runner
 from .parser import parse_log_buffer_lines, parse_result_dir
 from .runner import RunRequest
+from .seed import DEFAULT_ACCELERATOR_PERF, DEFAULT_GPU_TCO_TABLE
 from .state import LogLine, STATE
 
 
@@ -120,6 +121,10 @@ SUPPORTED_LLMD = {
 
 class DashboardPinsBody(BaseModel):
     pins: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class DocumentBody(BaseModel):
+    document: Any = None
 
 
 class StartRunBody(BaseModel):
@@ -630,6 +635,28 @@ async def get_dashboard():
 async def put_dashboard(body: DashboardPinsBody):
     pins = STATE.persist_dashboard(body.pins or [])
     return {"ok": True, "pins": pins}
+
+
+@app.get("/api/accelerator-perf")
+async def get_accelerator_perf():
+    doc = STATE.load_document("accelerator_perf", None)
+    return {"document": doc if doc is not None else DEFAULT_ACCELERATOR_PERF}
+
+
+@app.put("/api/accelerator-perf")
+async def put_accelerator_perf(body: DocumentBody):
+    return {"ok": True, "document": STATE.persist_document("accelerator_perf", body.document)}
+
+
+@app.get("/api/gpu-tco-table")
+async def get_gpu_tco_table():
+    doc = STATE.load_document("gpu_tco_table", None)
+    return {"document": doc if doc is not None else DEFAULT_GPU_TCO_TABLE}
+
+
+@app.put("/api/gpu-tco-table")
+async def put_gpu_tco_table(body: DocumentBody):
+    return {"ok": True, "document": STATE.persist_document("gpu_tco_table", body.document)}
 
 
 @app.get("/api/runs/{run_id}")
