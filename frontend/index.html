@@ -277,6 +277,7 @@
       padding:12px 16px; border-radius:15px;
       border:1px solid #262433; background:rgba(255,255,255,.02);
     }
+    .zone-head { flex-wrap:wrap; }
     .zone-head.zh-volt   { background:linear-gradient(90deg, rgba(187,134,252,.13), rgba(187,134,252,.015) 72%); border-color:rgba(187,134,252,.24); }
     .zone-head.zh-second { background:linear-gradient(90deg, rgba(3,218,198,.12),  rgba(3,218,198,.015) 72%);  border-color:rgba(3,218,198,.24); }
     .zone-head.zh-accent { background:linear-gradient(90deg, rgba(242,85,125,.12), rgba(242,85,125,.015) 72%); border-color:rgba(242,85,125,.24); }
@@ -502,9 +503,12 @@
       background:radial-gradient(520px 220px at 8% 0%, rgba(187,134,252,.16), transparent 62%), linear-gradient(180deg, rgba(28,27,37,.92), rgba(15,15,22,.94));
       border-color:rgba(187,134,252,.20);
     }
-    .gpu-stepper input::-webkit-outer-spin-button,
-    .gpu-stepper input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
-    .gpu-stepper input[type=number] { -moz-appearance:textfield; appearance:textfield; }
+    /* 숫자 입력의 브라우저 기본 스피너는 전역으로 숨긴다.
+       필드별로 다시 스코프하지 말 것 — 새 숫자 입력을 추가할 때마다 빠뜨리게 된다.
+       그리고 이 스피너를 다시 되살리지 말 것. */
+    input[type=number]::-webkit-outer-spin-button,
+    input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+    input[type=number] { -moz-appearance:textfield; appearance:textfield; }
     .node-chip { font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-weight:760; font-size:12.5px; padding:7px 8px 7px 10px; }
     .node-chip-gpu { color:#03DAC6; font-size:12px; font-weight:900; letter-spacing:-.01em; }
     .summary-node b { color:#03DAC6; font-weight:900; }
@@ -2371,6 +2375,22 @@
         body: JSON.stringify({ pins: pins || [] }),
       });
     },
+    async getAcceleratorPerf() { return fetchJsonOrThrow("/api/accelerator-perf"); },
+    async saveAcceleratorPerf(document) {
+      return fetchJsonOrThrow("/api/accelerator-perf", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ document }),
+      });
+    },
+    async getGpuTcoTable() { return fetchJsonOrThrow("/api/gpu-tco-table"); },
+    async saveGpuTcoTable(document) {
+      return fetchJsonOrThrow("/api/gpu-tco-table", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ document }),
+      });
+    },
     async startRun(body) {
       const r = await fetch("/api/runs", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -3031,7 +3051,7 @@
     );
   }
 
-  function ZoneHeader({ icon, accent = "volt", title, sub, tip, right }) {
+  function ZoneHeader({ icon, accent = "volt", title, sub, tip, titleExtra, right }) {
     return (
       <div className={"zone-head zh-" + accent}>
         <span className={"zone-ico zone-ico-" + accent}><Icon name={icon} /></span>
@@ -3039,6 +3059,7 @@
           <div className="flex items-center gap-2">
             <span className="zone-title">{title}</span>
             {tip && <InfoTip text={tip} />}
+            {titleExtra}
           </div>
           {sub && <div className="zone-sub">{sub}</div>}
         </div>
@@ -7642,7 +7663,7 @@ ${monitorHtml}
     );
   }
 
-  function Sidebar({ tab, setTab, clusterSub, setClusterSub, trainingSub, setTrainingSub, inferenceSub, setInferenceSub, runningCount, testStatus = {}, onAckTestStatus }) {
+  function Sidebar({ tab, setTab, dashboardSub, setDashboardSub, clusterSub, setClusterSub, trainingSub, setTrainingSub, inferenceSub, setInferenceSub, runningCount, testStatus = {}, onAckTestStatus }) {
     const statusLabel = (s) => {
       const v = String(s || "idle").toLowerCase();
       if (["running", "pending", "analyzing"].includes(v)) return "RUN";
@@ -7702,6 +7723,13 @@ ${monitorHtml}
 
         <nav className="flex-1 px-3 py-3 overflow-y-auto">
           <NavItem id="dashboard" icon="dashboard" label="대시보드" />
+          {tab === "dashboard" && (
+            <div className="mb-1">
+              <SubItem active={dashboardSub === "results"} onClick={() => setDashboardSub("results")} label="테스트 결과" />
+              <SubItem active={dashboardSub === "perf"} onClick={() => setDashboardSub("perf")} label="가속기별 성능" />
+              <SubItem active={dashboardSub === "cost"} onClick={() => setDashboardSub("cost")} label="비용 분석" />
+            </div>
+          )}
 
           <NavItem id="cluster" icon="cluster" label="테스트 클러스터 관리" />
           {tab === "cluster" && (
@@ -8432,6 +8460,1184 @@ ${monitorHtml}
   }
 
   
+  // ---------------------- Dashboard: 가속기별 성능 ----------------------
+
+  const PERF_CURRENT_YEAR = new Date().getFullYear();
+  // 벤더별 CAGR 기준 구간 기본값. 없으면 cagrRangeFor의 자동 로직으로 폴백한다.
+  const CAGR_DEFAULT_ID = { NVIDIA: { from: "H100", to: "B300" } };
+
+  const perfNum = (v) => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const perfFmt = (v) => {
+    const n = perfNum(v);
+    if (n === null) return "—";
+    if (Math.abs(n) >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    return String(Math.round(n * 100) / 100);
+  };
+  const perfVersionId = () => new Date().toISOString().slice(0, 19).replace("T", " ");
+
+  function AcceleratorPerfTab() {
+    const [doc, setDoc] = useState(null);
+    const [loadErr, setLoadErr] = useState("");
+    const [editMode, setEditMode] = useState(false);
+    const [showHbmDetail, setShowHbmDetail] = useState(false);
+    const [activeVersion, setActiveVersion] = useState(null);
+    const [metric, setMetric] = useState("fp16");
+    const [cagrRangeOverride, setCagrRangeOverride] = useState({});
+    const [msg, setMsg] = useState("");
+
+    useEffect(() => {
+      let alive = true;
+      api.getAcceleratorPerf()
+        .then((p) => {
+          if (!alive) return;
+          const d = p && p.document ? p.document : {};
+          setDoc(d);
+          // 처음 열었을 때 selector가 "현재 편집 중"이 아니라 "latest"를 가리키게 한다.
+          const latest = (d.versions || []).find((v) => v.label === "latest");
+          setActiveVersion(latest ? latest.versionId : null);
+        })
+        .catch((e) => { if (alive) setLoadErr(String((e && e.message) || e)); });
+      return () => { alive = false; };
+    }, []);
+
+    const columns = useMemo(() => {
+      const all = (doc && doc.columns) || [];
+      return all.filter((c) => (showHbmDetail ? true : !c.hbm));
+    }, [doc, showHbmDetail]);
+
+    const rows = (doc && doc.rows) || [];
+    const versions = (doc && doc.versions) || [];
+    const metricCols = useMemo(
+      () => ((doc && doc.columns) || []).filter((c) => c.kind === "number" && c.id !== "release_year" && !c.hbm),
+      [doc]
+    );
+
+    const persist = useCallback((next) => {
+      setDoc(next);
+      api.saveAcceleratorPerf(next)
+        .then(() => { setMsg("저장 완료"); setTimeout(() => setMsg(""), 2000); })
+        .catch((e) => setMsg("저장 실패: " + String((e && e.message) || e)));
+    }, []);
+
+    const setCell = (rowIdx, colId, value) => {
+      const next = { ...doc, rows: rows.map((r, i) => (i === rowIdx ? { ...r, [colId]: value } : r)) };
+      setDoc(next);
+    };
+    const deleteRow = (rowIdx) => {
+      const next = { ...doc, rows: rows.filter((_, i) => i !== rowIdx) };
+      next.row_order = next.rows.map((r) => r.model);
+      setDoc(next);
+    };
+    const addRow = () => {
+      const blank = {};
+      ((doc && doc.columns) || []).forEach((c) => { blank[c.id] = null; });
+      blank.vendor = "NVIDIA";
+      blank.model = "";
+      setDoc({ ...doc, rows: [...rows, blank] });
+    };
+
+    // --- 버전 관리 ---
+    const startEdit = () => { setEditMode(true); setActiveVersion(null); };
+    const cancelEdit = () => {
+      setEditMode(false);
+      const latest = versions.find((v) => v.label === "latest");
+      setActiveVersion(latest ? latest.versionId : null);
+    };
+    const saveVersion = () => {
+      const vid = perfVersionId();
+      // 기존 latest는 자기 versionId를 라벨로 갖는 일반 버전으로 밀린다.
+      const shifted = versions.map((v) => (v.label === "latest" ? { ...v, label: v.versionId } : v));
+      const created = { versionId: vid, label: "latest", savedAt: Date.now(), rows: JSON.parse(JSON.stringify(rows)) };
+      const next = { ...doc, versions: [...shifted, created], row_order: rows.map((r) => r.model) };
+      persist(next);
+      setEditMode(false);
+      setActiveVersion(vid);
+    };
+    const selectVersion = (vid) => {
+      setActiveVersion(vid || null);
+      if (!vid) return;
+      const v = versions.find((x) => x.versionId === vid);
+      if (v && v.rows) setDoc({ ...doc, rows: JSON.parse(JSON.stringify(v.rows)) });
+    };
+    const deleteVersion = (vid) => {
+      const target = versions.find((v) => v.versionId === vid);
+      // latest는 어느 경로로 호출되든 삭제하지 않는다(이중 방어).
+      if (!target || target.label === "latest") return;
+      const next = { ...doc, versions: versions.filter((v) => v.versionId !== vid) };
+      persist(next);
+      if (activeVersion === vid) {
+        const latest = next.versions.find((v) => v.label === "latest");
+        setActiveVersion(latest ? latest.versionId : null);
+      }
+    };
+    const promoteToLatest = (vid) => {
+      const target = versions.find((v) => v.versionId === vid);
+      if (!target || target.label === "latest") return;
+      // 선택 버전과 기존 latest가 라벨을 맞바꾼다 — saveVersion이 이전 latest를
+      // 날짜 라벨로 미는 것과 같은 패턴.
+      const next = {
+        ...doc,
+        versions: versions.map((v) => {
+          if (v.versionId === vid) return { ...v, label: "latest" };
+          if (v.label === "latest") return { ...v, label: v.versionId };
+          return v;
+        }),
+      };
+      persist(next);
+    };
+
+    const activeVersionObj = versions.find((v) => v.versionId === activeVersion) || null;
+    const canPromote = !!activeVersionObj && activeVersionObj.label !== "latest";
+
+    // --- CAGR ---
+    const vendors = useMemo(() => {
+      const seen = [];
+      rows.forEach((r) => { if (r.vendor && !seen.includes(r.vendor)) seen.push(r.vendor); });
+      return seen;
+    }, [rows]);
+
+    const vendorCagrOptions = useCallback((vendor) => (
+      rows
+        .filter((r) => r.vendor === vendor && perfNum(r.release_year) !== null && perfNum(r[metric]) !== null)
+        .map((r) => ({ id: r.model, model: r.model, year: perfNum(r.release_year), value: perfNum(r[metric]) }))
+        .sort((a, b) => a.year - b.year || String(a.model).localeCompare(String(b.model)))
+    ), [rows, metric]);
+
+    const cagrRangeFor = useCallback((vendor) => {
+      const opts = vendorCagrOptions(vendor);
+      if (opts.length < 2) return null;
+      const ov = cagrRangeOverride[vendor] || {};
+      const byId = (id) => opts.find((o) => o.id === id) || null;
+
+      let from = byId(ov.from);
+      if (!from) {
+        const dflt = CAGR_DEFAULT_ID[vendor];
+        from = (dflt && byId(dflt.from)) || opts.find((o) => o.year >= 2022) || opts[0];
+      }
+      let to = byId(ov.to);
+      if (!to) {
+        const dflt = CAGR_DEFAULT_ID[vendor];
+        to = dflt && byId(dflt.to);
+      }
+      if (!to) {
+        // from과 "연도가 다른" 후보 중 이미 출시된 마지막 것을 우선하고,
+        // 없으면 연도만 다르면 되는 전체 마지막 포인트로 폴백한다.
+        // (FP4처럼 한 해에 데이터가 몰린 지표에서 n=0이 되어 CAGR이 사라지던 문제)
+        const differing = opts.filter((o) => o.year !== from.year);
+        const released = differing.filter((o) => o.year <= PERF_CURRENT_YEAR);
+        to = released.length ? released[released.length - 1]
+           : (differing.length ? differing[differing.length - 1] : null);
+      }
+      if (!to || !from || to.year === from.year) return null;
+      const anchor = from.year <= to.year ? from : to;
+      const far = from.year <= to.year ? to : from;
+      const n = far.year - anchor.year;
+      if (n === 0) return null;
+      const cagr = Math.pow(far.value / anchor.value, 1 / n) - 1;
+      if (!Number.isFinite(cagr)) return null;
+      return { from, to, anchor, far, n, cagr, options: opts };
+    }, [vendorCagrOptions, cagrRangeOverride]);
+
+    const setCagrEndpoint = (vendor, which, id) => {
+      setCagrRangeOverride((prev) => ({ ...prev, [vendor]: { ...(prev[vendor] || {}), [which]: id } }));
+    };
+
+    const chart = useMemo(() => {
+      const yearSet = new Set();
+      rows.forEach((r) => { const y = perfNum(r.release_year); if (y !== null) yearSet.add(y); });
+      const ranges = {};
+      vendors.forEach((v) => { const rg = cagrRangeFor(v); if (rg) ranges[v] = rg; });
+      let maxYear = 0;
+      yearSet.forEach((y) => { maxYear = Math.max(maxYear, y); });
+      const endYear = Math.max(maxYear, PERF_CURRENT_YEAR) + 2;
+      let minYear = Infinity;
+      yearSet.forEach((y) => { minYear = Math.min(minYear, y); });
+      if (!Number.isFinite(minYear)) return { data: [], ranges };
+
+      const years = [];
+      for (let y = minYear; y <= endYear; y++) years.push(y);
+      const data = years.map((y) => {
+        const point = { year: y };
+        vendors.forEach((v) => {
+          const actual = rows.find((r) => r.vendor === v && perfNum(r.release_year) === y && perfNum(r[metric]) !== null);
+          if (actual) point[v] = perfNum(actual[metric]);
+          const rg = ranges[v];
+          // 추세선은 from GPU 연도부터 미래까지 이어지도록 anchor 연도에서 시작한다.
+          if (rg && y >= rg.anchor.year) {
+            point[v + "__cagr"] = rg.anchor.value * Math.pow(1 + rg.cagr, y - rg.anchor.year);
+          }
+        });
+        return point;
+      });
+      return { data, ranges };
+    }, [rows, vendors, metric, cagrRangeFor]);
+
+    if (loadErr) {
+      return <div className="card"><div className="card-pad text-[12px] text-err font-mono">불러오기 실패: {loadErr}</div></div>;
+    }
+    if (!doc) {
+      return <div className="card"><div className="card-pad text-[12px] text-fog-500 font-mono">불러오는 중…</div></div>;
+    }
+
+    const colorFor = (i) => DASHBOARD_CHART_COLORS[i % DASHBOARD_CHART_COLORS.length];
+
+    return (
+      <div className="space-y-4 fade-up" style={{ maxWidth: "calc(1600px + var(--content-extra-w, 0px))" }}>
+        <div className="card">
+          <div className="card-pad">
+            <ZoneHeader
+              icon="dashboard" accent="volt" title="가속기별 성능 스펙"
+              right={
+                <div className="flex items-center gap-2 flex-wrap">
+                  {msg && <span className="text-[10px] font-mono text-volt">{msg}</span>}
+                  <select className="inp font-mono text-[11px]" value={activeVersion || ""}
+                          onChange={(e) => selectVersion(e.target.value)} style={{ minWidth: 180 }}>
+                    <option value="">현재 편집 중</option>
+                    {versions.map((v) => (
+                      <option key={v.versionId} value={v.versionId}>{v.label}</option>
+                    ))}
+                  </select>
+                  {canPromote && (
+                    <button className="btn px-2 py-1 rounded text-[10px] font-mono border border-line bg-ink-850 hover:bg-ink-700 text-fog-300"
+                            onClick={() => promoteToLatest(activeVersion)}>latest로 변경</button>
+                  )}
+                  {canPromote && (
+                    <button className="btn px-2 py-1 rounded text-[10px] font-mono border border-line bg-ink-850 hover:bg-err/10 text-fog-300 hover:text-err"
+                            onClick={() => deleteVersion(activeVersion)}>이 버전 삭제</button>
+                  )}
+                  <button className="btn px-2 py-1 rounded text-[10px] font-mono border border-line bg-ink-850 hover:bg-ink-700 text-fog-300"
+                          onClick={() => setShowHbmDetail((v) => !v)}>
+                    {showHbmDetail ? "HBM 상세 정보 숨기기" : "HBM 상세 정보"}
+                  </button>
+                  {!editMode ? (
+                    <button className="btn px-2 py-1 rounded border border-volt/40 bg-volt/10 hover:bg-volt/20 text-volt font-mono text-[10px] uppercase tracking-wider"
+                            onClick={startEdit}>수정</button>
+                  ) : (
+                    <React.Fragment>
+                      <button className="btn px-2 py-1 rounded border border-volt/40 bg-volt/10 hover:bg-volt/20 text-volt font-mono text-[10px] uppercase tracking-wider"
+                              onClick={saveVersion}>저장</button>
+                      <button className="btn px-2 py-1 rounded text-[10px] font-mono border border-line bg-ink-850 hover:bg-ink-700 text-fog-300"
+                              onClick={cancelEdit}>취소</button>
+                    </React.Fragment>
+                  )}
+                </div>
+              }
+            />
+
+            {/* 표는 HBM 상세를 켜도 항상 컨테이너 전체 폭을 채운다. */}
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    {columns.map((c) => (
+                      <th key={c.id} style={{ minWidth: c.width, textAlign: "left", padding: "8px 10px",
+                                              borderBottom: "1px solid #2c2a39", color: "#c9c5d6",
+                                              fontWeight: 600, whiteSpace: "nowrap" }}>{c.label}</th>
+                    ))}
+                    {editMode && (
+                      <th style={{ width: 44, position: "sticky", right: 0, background: "#141225",
+                                   borderBottom: "1px solid #2c2a39" }}></th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, ri) => (
+                    <tr key={ri}>
+                      {columns.map((c) => (
+                        <td key={c.id} style={{ padding: "6px 10px", borderBottom: "1px solid #221f30", color: "#e8e6f0" }}>
+                          {editMode ? (
+                            <input
+                              type={c.kind === "number" ? "number" : "text"}
+                              className="inp font-mono text-[12px]"
+                              style={{ width: "100%", minWidth: 60 }}
+                              value={r[c.id] === null || r[c.id] === undefined ? "" : r[c.id]}
+                              onChange={(e) => setCell(ri, c.id, c.kind === "number" ? (e.target.value === "" ? null : Number(e.target.value)) : e.target.value)}
+                            />
+                          ) : (
+                            c.kind !== "number" ? (r[c.id] || "—")
+                              : c.id === "release_year"
+                                ? (perfNum(r[c.id]) === null ? "—" : String(perfNum(r[c.id])))
+                                : perfFmt(r[c.id])
+                          )}
+                        </td>
+                      ))}
+                      {editMode && (
+                        <td style={{ position: "sticky", right: 0, background: "#141225",
+                                     borderBottom: "1px solid #221f30", textAlign: "center" }}>
+                          <button className="btn shrink-0 px-1.5 py-0.5 rounded text-[10px] font-mono border border-line bg-ink-850 hover:bg-err/10 text-fog-300 hover:text-err"
+                                  onClick={() => deleteRow(ri)}>×</button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {editMode && (
+              <div className="mt-2">
+                <button className="btn px-2 py-1 rounded text-[10px] font-mono border border-line bg-ink-850 hover:bg-ink-700 text-fog-300"
+                        onClick={addRow}>+ 행 추가</button>
+              </div>
+            )}
+
+            {versions.length > 0 && (
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-mono text-fog-500 uppercase tracking-wider">저장된 버전</span>
+                {versions.map((v) => (
+                  <span key={v.versionId}
+                        className={"px-2 py-0.5 rounded-full text-[10px] font-mono border " +
+                                   (v.label === "latest" ? "border-volt/40 bg-volt/10 text-volt" : "border-line bg-ink-850 text-fog-300")}>
+                    {v.label}
+                    {/* latest pill에는 삭제 버튼 자체를 띄우지 않는다. */}
+                    {v.label !== "latest" && (
+                      <button className="btn ml-1 text-fog-500 hover:text-err" onClick={() => deleteVersion(v.versionId)}>×</button>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-pad">
+            <ZoneHeader
+              icon="dashboard" accent="second" title="성능 추세 · CAGR"
+              right={
+                <select className="inp font-mono text-[11px]" value={metric} onChange={(e) => setMetric(e.target.value)}>
+                  {metricCols.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                </select>
+              }
+            />
+
+            <div className="flex flex-wrap gap-4 mb-3">
+              {vendors.map((v) => {
+                const rg = chart.ranges[v];
+                const opts = vendorCagrOptions(v);
+                return (
+                  <div key={v} className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-mono text-fog-300">{v} CAGR 기준</span>
+                    <select className="inp font-mono text-[11px]" value={rg ? rg.from.id : ""}
+                            onChange={(e) => setCagrEndpoint(v, "from", e.target.value)}>
+                      {opts.map((o) => <option key={o.id} value={o.id}>{o.model} ({o.year})</option>)}
+                    </select>
+                    <span className="text-[11px] text-fog-500">→</span>
+                    <select className="inp font-mono text-[11px]" value={rg ? rg.to.id : ""}
+                            onChange={(e) => setCagrEndpoint(v, "to", e.target.value)}>
+                      {opts.map((o) => <option key={o.id} value={o.id}>{o.model} ({o.year})</option>)}
+                    </select>
+                    <span className="text-[11px] font-mono" style={{ color: rg ? "#03DAC6" : "#8a839c" }}>
+                      {rg ? (rg.cagr * 100).toFixed(1) + "% / 년" : "구간 부족"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {chart.data.length === 0 ? (
+              <div className="text-[12px] text-fog-500 font-mono py-8 text-center">
+                표에 출시연도와 성능 값을 채우면 추세선이 그려집니다.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={420}>
+                <LineChart data={chart.data} margin={{ top: 10, right: 24, left: 4, bottom: 8 }}>
+                  <CartesianGrid stroke="#2c2a39" strokeDasharray="3 3" />
+                  <XAxis dataKey="year" type="number" domain={["dataMin", "dataMax"]} allowDecimals={false}
+                         tick={{ fontSize: 11, fontFamily: "ui-monospace, monospace", fill: "#9aa3b2" }} stroke="#46415c" />
+                  <YAxis tick={{ fontSize: 11, fontFamily: "ui-monospace, monospace", fill: "#9aa3b2" }} stroke="#46415c" />
+                  <Tooltip contentStyle={{ background: "#141225", border: "1px solid #2c2a39", fontSize: 11, fontFamily: "ui-monospace, monospace" }} />
+                  <Legend wrapperStyle={{ fontSize: 11, fontFamily: "ui-monospace, monospace" }} />
+                  {vendors.map((v, i) => (
+                    <Line key={v} type="monotone" dataKey={v} name={v} stroke={colorFor(i)}
+                          strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                  ))}
+                  {vendors.map((v, i) => (
+                    <Line key={v + "__cagr"} type="monotone" dataKey={v + "__cagr"} name={v + " CAGR"}
+                          stroke={colorFor(i)} strokeWidth={1.5} strokeDasharray="5 4" dot={false} connectNulls />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---------------------- Dashboard: 비용 분석 ----------------------
+
+  // 엑셀의 들여쓰기는 셀 서식(비주얼) 속성이라 텍스트로 복사하면 앞쪽 공백이
+  // 전혀 남지 않는다. 붙여넣은 행의 들여쓰기는 이 라벨→들여쓰기 맵에서 되살린다.
+  // 새 항목을 추가할 땐 이 맵도 같이 갱신해야 트리 표시(├/└)가 제대로 나온다.
+  // backend/seed.py 의 KNOWN_ROW_INDENT 와 같은 내용.
+  const KNOWN_ROW_INDENT = {
+    "TCO": 0,
+    "감가비(직투)": 0, "서버": 1, "네트워크": 1,
+    "Infiniband": 2, "Ethernet": 2, "케이블 포설": 2,
+    "운영서버": 1, "스토리지": 1,
+    "운영비": 0, "유지보수": 1, "전기료": 1, "상면비": 1,
+  };
+  const TCO_GROUP_COLORS = { "감가비(직투)": "#FFB86C", "운영비": "#8BE9FD" };
+  const TCO_DELTA_GOOD = "#03DAC6";
+  const TCO_DELTA_BAD = "#CF6679";
+
+  const costNum = (v) => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(String(v).replace(/,/g, ""));
+    return Number.isFinite(n) ? n : null;
+  };
+  const costFmt = (v, digits = 0) => {
+    const n = costNum(v);
+    if (n === null) return "—";
+    return n.toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: 0 });
+  };
+
+  // --- 트리 렌더링 헬퍼: rows 배열만 받는 순수 함수 ---
+  // label/indent만 보고 동작하므로 메인 TCO 표(구역 A)와 "신규 가속기 도입 TCO
+  // 분석"(구역 C)의 breakdown 표 양쪽에서 그대로 재사용한다.
+  function tcoChildIndices(rows, i) {
+    const parent = rows[i];
+    const out = [];
+    for (let j = i + 1; j < rows.length; j++) {
+      if (rows[j].indent <= parent.indent) break;
+      if (rows[j].indent === parent.indent + 1) out.push(j);
+    }
+    return out;
+  }
+  function computeGroupColors(rows) {
+    let current = null;
+    return rows.map((r) => {
+      if (r.indent === 0) {
+        current = TCO_GROUP_COLORS[r.label] || r.label_color || null;
+        return current;
+      }
+      return current;
+    });
+  }
+  function computeNetworkGuide(rows) {
+    // indent 2 이상은 상위 그룹(네트워크 등) 아래의 서브가이드를 하나 더 그린다.
+    return rows.map((r) => r.indent >= 2);
+  }
+  function computeTreeChars(rows) {
+    return rows.map((r, i) => {
+      if (!r.indent) return "";
+      let last = true;
+      for (let j = i + 1; j < rows.length; j++) {
+        if (rows[j].indent < r.indent) break;
+        if (rows[j].indent === r.indent) { last = false; break; }
+      }
+      return last ? "└" : "├";
+    });
+  }
+  // 집계행(자식이 있는 행)은 자식의 합으로만 계산된다 — 직접 수정하지 않는다.
+  // TCO는 indent 0의 그룹행(감가비/운영비) 합이라 따로 처리한다.
+  function computeTcoValues(rows, columns) {
+    const vals = rows.map((r) => ({ ...(r.values || {}) }));
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const kids = tcoChildIndices(rows, i);
+      if (!kids.length) continue;
+      columns.forEach((c) => {
+        let sum = 0, any = false;
+        kids.forEach((k) => { const v = costNum(vals[k][c]); if (v !== null) { sum += v; any = true; } });
+        if (any) vals[i][c] = sum;
+      });
+    }
+    const tcoIdx = rows.findIndex((r) => r.label === "TCO");
+    if (tcoIdx >= 0) {
+      columns.forEach((c) => {
+        let sum = 0, any = false;
+        rows.forEach((r, i) => {
+          if (i !== tcoIdx && r.indent === 0) {
+            const v = costNum(vals[i][c]);
+            if (v !== null) { sum += v; any = true; }
+          }
+        });
+        if (any) vals[tcoIdx][c] = sum;
+      });
+    }
+    return vals;
+  }
+  function isAggregateRow(rows, i) { return tcoChildIndices(rows, i).length > 0 || rows[i].label === "TCO"; }
+
+  // --- 붙여넣기 파싱 ---
+  // 탭(TSV) 또는 공백 2개 이상 어느 쪽이든 자동 인식.
+  function splitPastedCells(line) {
+    if (line.indexOf("\t") >= 0) return line.split("\t");
+    return line.split(/ {2,}/);
+  }
+  // 헤더/각 행 모두 "뒤에서부터 GPU 모델 개수(N)만큼을 값으로, 그 앞의 비어있지
+  // 않은 셀을 라벨로" 잡는다. 라벨 칸이 병합돼 있으면 그 폭만큼 빈 셀이 따라오고
+  // 병합 폭은 행마다 다르므로, 고정 오프셋으로 자르면 반드시 깨진다.
+  function parseTsv(text) {
+    const lines = String(text || "").replace(/\r/g, "").split("\n").filter((l) => l.trim() !== "");
+    if (lines.length < 2) return null;
+    const headerCells = splitPastedCells(lines[0]);
+    const headerNonEmpty = headerCells.map((c) => c.trim()).filter((c) => c !== "");
+    // 헤더의 첫 non-empty 셀은 라벨 칸이므로 버린다.
+    const columns = headerNonEmpty.slice(1);
+    if (!columns.length) return null;
+    const n = columns.length;
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cells = splitPastedCells(lines[i]);
+      if (cells.length < n) continue;
+      const valueCells = cells.slice(cells.length - n);
+      const labelPart = cells.slice(0, cells.length - n).map((c) => c.trim()).filter((c) => c !== "");
+      const label = labelPart.join(" ").trim();
+      if (!label) continue;
+      const values = {};
+      columns.forEach((c, ci) => { const v = costNum(valueCells[ci]); if (v !== null) values[c] = v; });
+      rows.push({
+        label,
+        indent: KNOWN_ROW_INDENT[label] !== undefined ? KNOWN_ROW_INDENT[label] : 1,
+        highlight: label === "TCO",
+        label_color: TCO_GROUP_COLORS[label] || null,
+        values,
+      });
+    }
+    if (!rows.length) return null;
+    return { columns, rows };
+  }
+  // 헤더 첫 칸에 반드시 비어있지 않은 라벨을 넣어야 한다. 비워두면 재파싱 때
+  // 실제 컬럼명 하나가 라벨로 오인되어 전부 밀린다.
+  function serializeTsv(columns, rows, values) {
+    const head = ["GPU 모델"].concat(columns).join("\t");
+    const body = rows.map((r, i) =>
+      [r.label].concat(columns.map((c) => {
+        const v = costNum((values && values[i] ? values[i] : r.values || {})[c]);
+        return v === null ? "" : String(v);
+      })).join("\t")
+    );
+    return [head].concat(body).join("\n");
+  }
+
+  // 화면 전역에 떠야 하는 모달/팝오버는 처음부터 ModalPortal로 document.body에
+  // 직접 그린다. 조상에 transform/animation/filter가 있으면(.fade-up 등)
+  // position:fixed의 기준점이 뷰포트가 아니라 그 조상이 되어 엉뚱한 데 뜬다.
+  function TcoFormulaModal({ onClose }) {
+    const term = (color, title, body, note) => (
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ color, fontSize: 12, fontWeight: 700, marginBottom: 6, letterSpacing: ".04em" }}>{title}</div>
+        <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, color: "#e8e6f0",
+                      background: "#0f0d1c", border: "1px solid #2c2a39", borderRadius: 6, padding: "10px 12px",
+                      whiteSpace: "pre-wrap", lineHeight: 1.7 }}>{body}</div>
+        {note && <div style={{ fontSize: 11, color: "#8a839c", marginTop: 6, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{note}</div>}
+      </div>
+    );
+    return (
+      <ModalPortal>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(6,5,14,.72)", zIndex: 9999,
+                      display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+             onClick={onClose}>
+          <div className="card" style={{ maxWidth: 720, width: "100%", maxHeight: "82vh", overflowY: "auto" }}
+               onClick={(e) => e.stopPropagation()}>
+            <div className="card-pad">
+              <div className="flex items-center justify-between mb-4">
+                <span className="zone-title">GPU TCO 산출 수식</span>
+                <button className="btn px-2 py-1 rounded text-[12px] font-mono border border-line bg-ink-850 hover:bg-ink-700 text-fog-300"
+                        onClick={onClose}>×</button>
+              </div>
+
+              <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 13, color: "#BB86FC",
+                            marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid #2c2a39" }}>
+                GPU_TCO_per_hour = CAPEX + OPEX(유지보수 + 전기료 + 상면비)
+              </div>
+
+              {term("#FFB86C", "CAPEX — 감가비(직투)",
+                "CAPEX/hour = 취득원가 / (감가상각연수 × 연간가동시간) / GPU 수",
+                "※ 취득원가 = 서버 + 네트워크(Infiniband + Ethernet + 케이블 포설) + 운영서버 + 스토리지")}
+
+              {term("#8BE9FD", "OPEX — 유지보수",
+                "유지보수/hour = 취득원가 × 연간 유지보수율 / (연간가동시간 × GPU 수)")}
+
+              {term("#8BE9FD", "OPEX — 전기료",
+                "전기료/hour = 소비전력(kW) × PUE × 전력단가(원/kWh) / GPU 수",
+                "※ PUE = 데이터센터 총 소비전력 / IT 장비 소비전력")}
+
+              {term("#8BE9FD", "OPEX — 상면비",
+                "상면비/hour = 랙 상면 단가(원/월) × 점유 랙 수 / (월 가동시간 × GPU 수)")}
+
+              <div style={{ fontSize: 11, color: "#8a839c", lineHeight: 1.7, borderTop: "1px solid #2c2a39", paddingTop: 12 }}>
+                각 항의 입력값(취득원가, 감가상각연수, 유지보수율, 전력단가, PUE, 상면 단가)은
+                사내 원가시트 기준이며, 표의 값은 "엑셀 양식 붙여넣기"로 그 시트에서 그대로 가져옵니다.
+              </div>
+            </div>
+          </div>
+        </div>
+      </ModalPortal>
+    );
+  }
+
+  function CostAnalysisTab({ pinned }) {
+    const [doc, setDoc] = useState(null);
+    const [loadErr, setLoadErr] = useState("");
+    const [editMode, setEditMode] = useState(false);        // 엑셀 양식 붙여넣기
+    const [pasteDraft, setPasteDraft] = useState("");
+    const [cellEditMode, setCellEditMode] = useState(false); // UI 내 직접 셀 수정
+    const [editDraftRows, setEditDraftRows] = useState(null);
+    const [cellSaveMsg, setCellSaveMsg] = useState("");
+    const [showFormula, setShowFormula] = useState(false);
+    const [currency, setCurrency] = useState("KRW");
+    const [fxRate, setFxRate] = useState(1400);
+    const [hoveredGpuCard, setHoveredGpuCard] = useState(null);
+    const [hoveredGpuPos, setHoveredGpuPos] = useState({ x: 0, y: 0 });
+    const [newGpuServerPrice, setNewGpuServerPrice] = useState("4000");
+    const [newGpuRefModel, setNewGpuRefModel] = useState("B300");
+    const [newGpuTps, setNewGpuTps] = useState("10000");
+    const [newGpuCompareModel, setNewGpuCompareModel] = useState("B300");
+    const [newGpuOverrides, setNewGpuOverrides] = useState({});
+    const pasteRef = useRef(null);
+
+    useEffect(() => {
+      let alive = true;
+      api.getGpuTcoTable()
+        .then((p) => {
+          if (!alive) return;
+          const d = p && p.document ? p.document : {};
+          setDoc(d);
+          if (costNum(d.fx_rate) !== null) setFxRate(costNum(d.fx_rate));
+        })
+        .catch((e) => { if (alive) setLoadErr(String((e && e.message) || e)); });
+      return () => { alive = false; };
+    }, []);
+
+    // "수정" 진입 시 textarea를 자동 전체선택 — 바로 Ctrl+V만 해도 전체 교체된다.
+    useEffect(() => {
+      if (editMode && pasteRef.current) { pasteRef.current.focus(); pasteRef.current.select(); }
+    }, [editMode]);
+
+    const columns = (doc && doc.columns) || [];
+    const rows = (doc && doc.rows) || [];
+    const displayRows = cellEditMode && editDraftRows ? editDraftRows : rows;
+    const values = useMemo(() => computeTcoValues(displayRows, columns), [displayRows, columns]);
+    const groupColors = useMemo(() => computeGroupColors(displayRows), [displayRows]);
+    const treeChars = useMemo(() => computeTreeChars(displayRows), [displayRows]);
+    const netGuide = useMemo(() => computeNetworkGuide(displayRows), [displayRows]);
+    const tcoIdx = displayRows.findIndex((r) => r.label === "TCO");
+
+    const toDisplay = useCallback((krw) => {
+      const n = costNum(krw);
+      if (n === null) return null;
+      return currency === "USD" ? n / (fxRate || 1) : n;
+    }, [currency, fxRate]);
+    const unitSuffix = currency === "USD" ? "$" : "원";
+
+    const persist = useCallback((next) => {
+      setDoc(next);
+      api.saveGpuTcoTable(next)
+        .then(() => { setCellSaveMsg("저장 완료"); setTimeout(() => setCellSaveMsg(""), 2000); })
+        .catch((e) => setCellSaveMsg("저장 실패: " + String((e && e.message) || e)));
+    }, []);
+
+    // --- 엑셀 양식 붙여넣기 ---
+    const startEdit = () => { setPasteDraft(serializeTsv(columns, rows, values)); setEditMode(true); };
+    const applyEdit = () => {
+      const parsed = parseTsv(pasteDraft);
+      if (!parsed) { setCellSaveMsg("파싱 실패: 헤더 1줄 + 데이터 1줄 이상이 필요합니다"); return; }
+      persist({ ...doc, columns: parsed.columns, rows: parsed.rows });
+      setEditMode(false);
+    };
+
+    // --- UI 내 직접 셀 수정 (숫자 값만; 구조 변경은 엑셀 붙여넣기로) ---
+    const startCellEdit = () => { setEditDraftRows(JSON.parse(JSON.stringify(rows))); setCellEditMode(true); };
+    const cancelCellEdit = () => { setEditDraftRows(null); setCellEditMode(false); };
+    const saveCellEdits = () => {
+      persist({ ...doc, rows: editDraftRows });
+      setEditDraftRows(null);
+      setCellEditMode(false);
+    };
+    const setDraftCell = (ri, col, v) => {
+      setEditDraftRows((prev) => prev.map((r, i) => (
+        i === ri ? { ...r, values: { ...(r.values || {}), [col]: v === "" ? null : Number(v) } } : r
+      )));
+    };
+
+    // --- TPS 배정 ---
+    const tpsAssignments = (doc && doc.tps_assignments) || {};
+    const tpsCandidates = useMemo(() => {
+      const out = [];
+      (pinned || []).forEach((p) => {
+        const m = p.metrics || {};
+        const tps = costNum(m.tokens_per_sec) ?? costNum(m.output_tokens_per_sec) ?? costNum(m.throughput);
+        if (tps === null) return;
+        out.push({
+          key: p.id || (p.run_id + "/" + (p.host || "")),
+          source: "test",
+          sourceLabel: "테스트 결과",
+          gpu: p.gpu_type || "",
+          value: tps,
+          label: [p.model, p.gpu_type, p.run_id].filter(Boolean).join(" · "),
+          detail: [
+            ["GPU 타입", p.gpu_type || "—"], ["모델", p.model || "—"],
+            ["Run ID", p.run_id || "—"], ["Host", p.host || "—"],
+            ["Env", p.env || "—"], ["Mode", p.mode || "—"],
+            ["TPS (tok/s)", costFmt(tps, 2)],
+          ],
+        });
+      });
+      return out;
+    }, [pinned]);
+
+    const applyAssignment = (col, cand) => {
+      const next = {
+        ...doc,
+        tps_assignments: {
+          ...tpsAssignments,
+          [col]: cand ? { value: cand.value, source: cand.source, label: cand.label, detail: cand.detail } : undefined,
+        },
+      };
+      if (!cand) delete next.tps_assignments[col];
+      persist(next);
+    };
+
+    // 시간당 TCO(원) 기준. 1M 토큰당 단가 = TCO/h ÷ (TPS × 3600) × 1e6
+    const perHour = (col) => (tcoIdx >= 0 ? costNum(values[tcoIdx][col]) : null);
+    const costPerMillion = (col) => {
+      const tco = perHour(col);
+      const tps = costNum((tpsAssignments[col] || {}).value);
+      if (tco === null || tps === null || tps <= 0) return null;
+      return (tco / (tps * 3600)) * 1e6;
+    };
+
+    const priceRanked = useMemo(() => {
+      const withCost = columns.map((c) => ({ col: c, cost: costPerMillion(c) })).filter((x) => x.cost !== null);
+      if (withCost.length < 2) return { cheapest: null, priciest: null };
+      const sorted = withCost.slice().sort((a, b) => a.cost - b.cost);
+      return { cheapest: sorted[0].col, priciest: sorted[sorted.length - 1].col };
+    }, [columns, values, tpsAssignments, tcoIdx]);
+
+    // --- 구역 C: 신규 가속기 도입 TCO 분석 ---
+    const refCol = columns.includes(newGpuRefModel) ? newGpuRefModel : (columns[0] || "");
+    const cmpCol = columns.includes(newGpuCompareModel) ? newGpuCompareModel : (columns[0] || "");
+    const analysis = useMemo(() => {
+      if (!refCol || !displayRows.length) return null;
+      const serverIdx = displayRows.findIndex((r) => r.label === "서버");
+      const refServer = serverIdx >= 0 ? costNum(values[serverIdx][refCol]) : null;
+      const newServer = costNum(newGpuServerPrice);
+      if (refServer === null || !refServer || newServer === null) return null;
+      const ratio = newServer / refServer;
+      // 리프 항목마다 서버 가격 비율을 적용하고, 집계행은 자식 합으로만 계산한다
+      // (메인 TCO 표와 동일한 구조 — 이중 소스오브트루스 방지).
+      const leafVals = displayRows.map((r, i) => {
+        if (isAggregateRow(displayRows, i)) return null;
+        if (newGpuOverrides[r.label] !== undefined) return costNum(newGpuOverrides[r.label]);
+        const base = costNum(values[i][refCol]);
+        return base === null ? null : base * ratio;
+      });
+      const newRows = displayRows.map((r, i) => ({ ...r, values: { NEW: leafVals[i] } }));
+      const newVals = computeTcoValues(newRows, ["NEW"]);
+      return { ratio, refServer, newServer, newVals: newVals.map((v) => v.NEW) };
+    }, [displayRows, values, refCol, newGpuServerPrice, newGpuOverrides]);
+
+    const newTcoPerHour = analysis && tcoIdx >= 0 ? analysis.newVals[tcoIdx] : null;
+    const cmpTcoPerHour = cmpCol ? perHour(cmpCol) : null;
+    const newTps = costNum(newGpuTps);
+    const cmpTps = costNum((tpsAssignments[cmpCol] || {}).value);
+    const newPerM = newTcoPerHour !== null && newTps ? (newTcoPerHour / (newTps * 3600)) * 1e6 : null;
+    const cmpPerM = cmpTcoPerHour !== null && cmpTps ? (cmpTcoPerHour / (cmpTps * 3600)) * 1e6 : null;
+    // 신규가 더 나쁘면(비쌈) 빨강, 더 좋으면(저렴) 청록. TPS만 방향이 반대.
+    const analysisDelta = (newV, cmpV, higherIsBetter) => {
+      if (newV === null || cmpV === null || !cmpV) return null;
+      const pct = ((newV - cmpV) / Math.abs(cmpV)) * 100;
+      const better = higherIsBetter ? pct > 0 : pct < 0;
+      return { pct, color: better ? TCO_DELTA_GOOD : TCO_DELTA_BAD, text: (pct >= 0 ? "" : "") + pct.toFixed(1) + "% " + (pct >= 0 ? "증가" : "감소") };
+    };
+
+    if (loadErr) return <div className="card"><div className="card-pad text-[12px] text-err font-mono">불러오기 실패: {loadErr}</div></div>;
+    if (!doc) return <div className="card"><div className="card-pad text-[12px] text-fog-500 font-mono">불러오는 중…</div></div>;
+
+    const rowFontSize = (r) => ((r.highlight || TCO_GROUP_COLORS[r.label]) ? 15 : 13);
+    const rowBgOf = (r) => (r.highlight ? "#BB86FC22" : (TCO_GROUP_COLORS[r.label] ? TCO_GROUP_COLORS[r.label] + "18" : undefined));
+
+    const metricBlock = (label, value, tier, delta, hideLabel) => (
+      <div style={{ marginBottom: 10 }}>
+        {!hideLabel && <div style={{ fontSize: 11, color: "#8a839c", marginBottom: 2 }}>{label}</div>}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <span style={{ fontFamily: "ui-monospace, monospace", fontWeight: 700,
+                         fontSize: tier === "primary" ? 27 : 19, color: "#e8e6f0" }}>
+            {value === null ? "—" : costFmt(value, tier === "primary" ? 0 : 2)}
+          </span>
+          {delta && <span style={{ fontSize: 12, color: delta.color, fontFamily: "ui-monospace, monospace" }}>({delta.text})</span>}
+        </div>
+      </div>
+    );
+
+    const sectionTitle = (t) => (
+      <div style={{ fontSize: 13, color: "#c9c5d6", fontWeight: 700, marginBottom: 8,
+                    borderTop: "1px solid #2c2a39", paddingTop: 10 }}>{t}</div>
+    );
+
+    return (
+      <div className="space-y-4 fade-up" style={{ maxWidth: "calc(1600px + var(--content-extra-w, 0px))" }}>
+        {showFormula && <TcoFormulaModal onClose={() => setShowFormula(false)} />}
+
+        {/* ---------- 구역 A: GPU 모델별 TCO ---------- */}
+        <div className="card">
+          <div className="card-pad">
+            <ZoneHeader
+              icon="dashboard" accent="volt" title="GPU 모델별 TCO"
+              titleExtra={!cellEditMode && !editMode ? (
+                <button className="btn px-2 py-1 rounded text-[10px] font-mono border border-line bg-ink-850 hover:bg-ink-700 text-fog-300"
+                        onClick={() => setShowFormula(true)}>TCO 수식 확인</button>
+              ) : null}
+              right={
+                <div className="flex items-center gap-2 flex-wrap">
+                  {cellSaveMsg && <span className="text-[10px] font-mono text-volt">{cellSaveMsg}</span>}
+                  {!cellEditMode && !editMode && (
+                    <React.Fragment>
+                      <span className="text-[11px] font-mono text-fog-400">₩/USD 환율</span>
+                      <input type="number" className="inp font-mono text-[11px]" style={{ width: 96 }}
+                             value={fxRate} onChange={(e) => setFxRate(Number(e.target.value) || 0)} />
+                      <button className="btn px-2 py-1 rounded text-[10px] font-mono border border-line bg-ink-850 hover:bg-ink-700 text-fog-300"
+                              onClick={() => setCurrency((c) => (c === "KRW" ? "USD" : "KRW"))}>
+                        {currency === "KRW" ? "원" : "USD"}
+                      </button>
+                      <button className="btn px-2 py-1 rounded text-[10px] font-mono border border-line bg-ink-850 hover:bg-ink-700 text-fog-300"
+                              onClick={startEdit}>엑셀 양식 붙여넣기</button>
+                      <button className="btn px-2 py-1 rounded border border-volt/40 bg-volt/10 hover:bg-volt/20 text-volt font-mono text-[10px] uppercase tracking-wider"
+                              onClick={startCellEdit}>수정</button>
+                    </React.Fragment>
+                  )}
+                  {cellEditMode && (
+                    <React.Fragment>
+                      <button className="btn px-2 py-1 rounded border border-volt/40 bg-volt/10 hover:bg-volt/20 text-volt font-mono text-[10px] uppercase tracking-wider"
+                              onClick={saveCellEdits}>저장</button>
+                      <button className="btn px-2 py-1 rounded text-[10px] font-mono border border-line bg-ink-850 hover:bg-ink-700 text-fog-300"
+                              onClick={cancelCellEdit}>취소</button>
+                    </React.Fragment>
+                  )}
+                  {editMode && (
+                    <React.Fragment>
+                      <button className="btn px-2 py-1 rounded border border-volt/40 bg-volt/10 hover:bg-volt/20 text-volt font-mono text-[10px] uppercase tracking-wider"
+                              onClick={applyEdit}>반영</button>
+                      <button className="btn px-2 py-1 rounded text-[10px] font-mono border border-line bg-ink-850 hover:bg-ink-700 text-fog-300"
+                              onClick={() => setEditMode(false)}>취소</button>
+                    </React.Fragment>
+                  )}
+                </div>
+              }
+            />
+
+            {editMode ? (
+              <textarea ref={pasteRef} className="inp font-mono text-[12px]"
+                        style={{ width: "100%", height: 320, whiteSpace: "pre", overflowWrap: "normal", overflowX: "auto" }}
+                        value={pasteDraft} onChange={(e) => setPasteDraft(e.target.value)}
+                        spellCheck={false} />
+            ) : (
+              <React.Fragment>
+                {/* 편집 중에는 상단 요약 표를 숨긴다(파싱 모드와 동일 패턴). */}
+                {!cellEditMode && tcoIdx >= 0 && columns.length > 0 && (
+                  <div style={{ overflowX: "auto", marginBottom: 14 }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: "left", padding: "6px 10px", color: "#8a839c", fontSize: 12, fontWeight: 600 }}>구분</th>
+                          {columns.map((c) => (
+                            <th key={c} style={{ textAlign: "right", padding: "6px 10px", color: "#c9c5d6", fontSize: 12, fontWeight: 600 }}>{c}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[["시간당 TCO", 1], ["일당 TCO", 24], ["월당 TCO", 24 * 30], ["연당 TCO", 24 * 365]].map(([lbl, mul], i) => (
+                          <tr key={lbl}>
+                            <td style={{ padding: "5px 10px", fontSize: i === 0 ? 15 : 13, fontWeight: i === 0 ? 700 : 400, color: "#e8e6f0" }}>{lbl}</td>
+                            {columns.map((c) => {
+                              const v = perHour(c);
+                              return (
+                                <td key={c} style={{ padding: "5px 10px", textAlign: "right", fontFamily: "ui-monospace, monospace",
+                                                     fontSize: i === 0 ? 15 : 13, fontWeight: i === 0 ? 700 : 400, color: "#e8e6f0" }}>
+                                  {v === null ? "—" : costFmt(toDisplay(v * mul), 0) + unitSuffix}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {columns.length === 0 ? (
+                  <div className="text-[12px] text-fog-500 font-mono py-8 text-center">
+                    "엑셀 양식 붙여넣기"로 사내 원가시트의 GPU 모델별 TCO 표를 붙여넣으세요.
+                  </div>
+                ) : (
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+                      <colgroup>
+                        <col style={{ width: 200 }} />
+                        {columns.map((c) => <col key={c} style={{ width: "calc((100% - 200px) / " + columns.length + ")" }} />)}
+                      </colgroup>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: "left", padding: "8px 10px", borderBottom: "1px solid #2c2a39",
+                                       color: "#8a839c", fontSize: 12, fontWeight: 600 }}>구분</th>
+                          {columns.map((c) => (
+                            <th key={c} style={{ textAlign: "right", padding: "8px 10px", borderBottom: "1px solid #2c2a39",
+                                                 color: "#c9c5d6", fontSize: 12, fontWeight: 600 }}>{c}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {displayRows.map((r, ri) => {
+                          const color = groupColors[ri];
+                          const isMajor = r.highlight || !!TCO_GROUP_COLORS[r.label];
+                          const agg = isAggregateRow(displayRows, ri);
+                          return (
+                            <tr key={ri} style={{ background: rowBgOf(r) }}>
+                              <td style={{ padding: "6px 10px", borderBottom: "1px solid #221f30",
+                                           borderLeft: color ? ("3px solid " + color) : "3px solid transparent",
+                                           fontSize: rowFontSize(r), fontWeight: isMajor ? 700 : 400,
+                                           color: TCO_GROUP_COLORS[r.label] || "#e8e6f0",
+                                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                                  <span style={{ fontFamily: "ui-monospace, monospace", color: "#4b4560" }}>
+                                    {netGuide[ri] ? "│ " : ""}{treeChars[ri]}
+                                  </span>
+                                  <span>{r.label}</span>
+                                  {/* 구분 열이 200px 고정이라 TCO 캡션만 남긴다. */}
+                                  {r.label === "TCO" && (
+                                    <span style={{ fontSize: 11, color: "#8a839c", fontWeight: 400 }}>= CAPEX + OPEX</span>
+                                  )}
+                                </span>
+                              </td>
+                              {columns.map((c) => (
+                                <td key={c} style={{ padding: "6px 10px", textAlign: "right", borderBottom: "1px solid #221f30",
+                                                     fontFamily: "ui-monospace, monospace", fontSize: rowFontSize(r),
+                                                     fontWeight: isMajor ? 700 : 400, color: "#e8e6f0" }}>
+                                  {cellEditMode && !agg ? (
+                                    <input type="number" className="inp font-mono text-[12px]" style={{ width: "100%", textAlign: "right" }}
+                                           value={(displayRows[ri].values || {})[c] === null || (displayRows[ri].values || {})[c] === undefined ? "" : (displayRows[ri].values || {})[c]}
+                                           onChange={(e) => setDraftCell(ri, c, e.target.value)} />
+                                  ) : (
+                                    values[ri][c] === undefined || values[ri][c] === null ? "—" : costFmt(toDisplay(values[ri][c]), 0)
+                                  )}
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </React.Fragment>
+            )}
+          </div>
+        </div>
+
+        {/* ---------- 구역 B: 토큰 단가 비교 ---------- */}
+        <div className="card">
+          <div className="card-pad">
+            <ZoneHeader icon="dashboard" accent="second" title="토큰 단가 비교"
+                        sub="TCO와 배정된 TPS로 1M 토큰당 단가를 계산합니다." />
+            {columns.length === 0 ? (
+              <div className="text-[12px] text-fog-500 font-mono py-6 text-center">먼저 GPU 모델별 TCO 표를 채우세요.</div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+                {columns.map((c) => {
+                  const asg = tpsAssignments[c];
+                  const perM = costPerMillion(c);
+                  const isCheap = priceRanked.cheapest === c;
+                  const isPricey = priceRanked.priciest === c;
+                  return (
+                    <div key={c} className="card" style={{ background: "#141225", position: "relative" }}
+                         onMouseEnter={() => setHoveredGpuCard(c)}
+                         onMouseLeave={() => setHoveredGpuCard(null)}
+                         onMouseMove={(e) => setHoveredGpuPos({ x: e.clientX, y: e.clientY })}>
+                      <div className="card-pad" style={{ padding: 14 }}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span style={{ fontSize: 14, fontWeight: 700, color: "#e8e6f0" }}>{c}</span>
+                          {isCheap && <span className="px-2 py-0.5 rounded-full text-[10px] font-mono"
+                                            style={{ background: TCO_DELTA_GOOD + "22", color: TCO_DELTA_GOOD }}>최저가</span>}
+                          {isPricey && <span className="px-2 py-0.5 rounded-full text-[10px] font-mono"
+                                             style={{ background: TCO_DELTA_BAD + "22", color: TCO_DELTA_BAD }}>최고가</span>}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#8a839c" }}>1M 토큰당 단가</div>
+                        <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 22, fontWeight: 700, color: "#e8e6f0", marginBottom: 8 }}>
+                          {perM === null ? "—" : costFmt(toDisplay(perM), 2) + unitSuffix}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#8a839c" }}>TPS (TOK/s)</div>
+                        <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 15, color: "#e8e6f0", marginBottom: 8 }}>
+                          {asg ? costFmt(asg.value, 2) : "미배정"}
+                          {asg && <span style={{ fontSize: 11, color: "#8a839c", marginLeft: 6 }}>
+                            {asg.source === "official" ? "공식 결과" : "테스트 결과"}
+                          </span>}
+                        </div>
+                        <select className="inp font-mono text-[11px]" style={{ width: "100%" }}
+                                value={asg ? (asg.label || "") : ""}
+                                onChange={(e) => {
+                                  const cand = tpsCandidates.find((x) => x.label === e.target.value);
+                                  applyAssignment(c, cand || null);
+                                }}>
+                          <option value="">TPS 배정 안 함</option>
+                          {tpsCandidates.map((x) => <option key={x.key} value={x.label}>{x.label}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 커서를 따라다니는 상세 팝오버. ModalPortal로 body에 직접 그린다. */}
+        {hoveredGpuCard && tpsAssignments[hoveredGpuCard] && (
+          <ModalPortal>
+            <div style={{ position: "fixed", zIndex: 9999, pointerEvents: "none",
+                          left: Math.min(hoveredGpuPos.x + 16, (typeof window !== "undefined" ? window.innerWidth : 1200) - 300),
+                          top: Math.min(hoveredGpuPos.y + 16, (typeof window !== "undefined" ? window.innerHeight : 800) - 220),
+                          background: "#141225", border: "1px solid #2c2a39", borderRadius: 8,
+                          padding: "10px 12px", minWidth: 240, maxWidth: 320,
+                          boxShadow: "0 8px 24px rgba(0,0,0,.5)" }}>
+              {(() => {
+                const asg = tpsAssignments[hoveredGpuCard];
+                // detail 필드가 추가되기 이전에 배정된 레코드는 label만 있다.
+                // 스키마는 마이그레이션 없이 늘어나므로 항상 폴백을 둔다.
+                const detail = (asg.detail && asg.detail.length) ? asg.detail : [["정보", asg.label || "—"]];
+                return detail.map(([k, v], i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 11, marginBottom: 3 }}>
+                    <span style={{ color: "#8a839c" }}>{k}</span>
+                    <span style={{ color: "#e8e6f0", fontFamily: "ui-monospace, monospace" }}>{String(v)}</span>
+                  </div>
+                ));
+              })()}
+            </div>
+          </ModalPortal>
+        )}
+
+        {/* ---------- 구역 C: 신규 가속기 도입 TCO 분석 ---------- */}
+        <div className="card">
+          <div className="card-pad">
+            <ZoneHeader icon="dashboard" accent="accent" title="신규 가속기 도입 TCO 분석"
+                        sub="서버 가격에서 기존 비율 적용하여 기존 가속기와 CAPEX/OPEX, TCO 비교 분석" />
+
+            <div style={{ display: "flex", gap: 18, flexWrap: "wrap", alignItems: "flex-start", marginBottom: 14 }}>
+              <div style={{ width: 210 }}>
+                <div style={{ height: 30 }}>
+                  <div style={{ fontSize: 13, color: "#e8e6f0", fontWeight: 600 }}>서버 가격</div>
+                  <div style={{ fontSize: 11, color: "#8a839c" }}>(자가소비 포함, 원/시간/GPU)</div>
+                </div>
+                <input type="number" className="inp font-mono text-[12px]" style={{ width: "100%", marginTop: 8 }}
+                       value={newGpuServerPrice} onChange={(e) => setNewGpuServerPrice(e.target.value)} />
+              </div>
+              <div style={{ width: 170 }}>
+                <div style={{ height: 30, fontSize: 13, color: "#e8e6f0", fontWeight: 600 }}>TCO 비율 기준 GPU</div>
+                <select className="inp font-mono text-[12px]" style={{ width: "100%", marginTop: 8 }}
+                        value={refCol} onChange={(e) => setNewGpuRefModel(e.target.value)}>
+                  {columns.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div style={{ width: 140 }}>
+                <div style={{ height: 30, fontSize: 13, color: "#e8e6f0", fontWeight: 600 }}>TPS (TOK/s)</div>
+                <input type="number" className="inp font-mono text-[12px]" style={{ width: "100%", marginTop: 8 }}
+                       value={newGpuTps} onChange={(e) => setNewGpuTps(e.target.value)} />
+              </div>
+              <div style={{ width: 150 }}>
+                <div style={{ height: 30, fontSize: 13, color: "#e8e6f0", fontWeight: 600 }}>비교 GPU</div>
+                <select className="inp font-mono text-[12px]" style={{ width: "100%", marginTop: 8 }}
+                        value={cmpCol} onChange={(e) => setNewGpuCompareModel(e.target.value)}>
+                  {columns.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {!analysis ? (
+              <div className="text-[12px] text-fog-500 font-mono py-6 text-center">
+                기준 GPU의 "서버" 값과 신규 서버 가격이 있어야 비율 추정이 가능합니다.
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18, alignItems: "stretch" }}>
+                <div>
+                  <div style={{ fontSize: 11, color: "#8a839c", marginBottom: 8 }}>
+                    {refCol} 대비 항목별 서버 가격 비율({(analysis.ratio).toFixed(2)}×) 적용(신규 가속기 값 클릭 후 수정 가능)
+                  </div>
+                  <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+                    <colgroup>
+                      <col style={{ width: "33.3%" }} /><col style={{ width: "33.3%" }} /><col style={{ width: "33.3%" }} />
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid #2c2a39", color: "#8a839c", fontSize: 12 }}>구분</th>
+                        <th style={{ textAlign: "right", padding: "6px 8px", borderBottom: "1px solid #2c2a39", color: "#c9c5d6", fontSize: 12 }}>{cmpCol}</th>
+                        <th style={{ textAlign: "right", padding: "6px 8px", borderBottom: "1px solid #2c2a39", color: "#c9c5d6", fontSize: 12 }}>신규</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {displayRows.map((r, ri) => {
+                        const color = groupColors[ri];
+                        const isMajor = r.highlight || !!TCO_GROUP_COLORS[r.label];
+                        const agg = isAggregateRow(displayRows, ri);
+                        return (
+                          <tr key={ri} style={{ background: rowBgOf(r) }}>
+                            <td style={{ padding: "5px 8px", borderBottom: "1px solid #221f30",
+                                         borderLeft: color ? ("3px solid " + color) : "3px solid transparent",
+                                         fontSize: rowFontSize(r), fontWeight: isMajor ? 700 : 400,
+                                         color: TCO_GROUP_COLORS[r.label] || "#e8e6f0",
+                                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              <span style={{ fontFamily: "ui-monospace, monospace", color: "#4b4560" }}>
+                                {netGuide[ri] ? "│ " : ""}{treeChars[ri]}
+                              </span> {r.label}
+                            </td>
+                            <td style={{ padding: "5px 8px", textAlign: "right", borderBottom: "1px solid #221f30",
+                                         fontFamily: "ui-monospace, monospace", fontSize: rowFontSize(r), color: "#e8e6f0" }}>
+                              {values[ri][cmpCol] === undefined || values[ri][cmpCol] === null ? "—" : costFmt(toDisplay(values[ri][cmpCol]), 0)}
+                            </td>
+                            <td style={{ padding: "5px 8px", textAlign: "right", borderBottom: "1px solid #221f30",
+                                         fontFamily: "ui-monospace, monospace", fontSize: rowFontSize(r), color: "#e8e6f0" }}>
+                              {agg ? (
+                                analysis.newVals[ri] === null || analysis.newVals[ri] === undefined ? "—" : costFmt(toDisplay(analysis.newVals[ri]), 0)
+                              ) : (
+                                <input type="number" className="inp font-mono text-[12px]" style={{ width: "100%", textAlign: "right" }}
+                                       value={newGpuOverrides[r.label] !== undefined ? newGpuOverrides[r.label]
+                                              : (analysis.newVals[ri] === null || analysis.newVals[ri] === undefined ? "" : Math.round(analysis.newVals[ri]))}
+                                       onChange={(e) => setNewGpuOverrides((p) => ({ ...p, [r.label]: e.target.value }))} />
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  {[{ key: "cmp", title: cmpCol + " (비교)", tco: cmpTcoPerHour, tps: cmpTps, perM: cmpPerM, isNew: false },
+                    { key: "new", title: "신규 가속기", tco: newTcoPerHour, tps: newTps, perM: newPerM, isNew: true }].map((card) => {
+                    const dTco = card.isNew ? analysisDelta(card.tco, cmpTcoPerHour, false) : null;
+                    const dTps = card.isNew ? analysisDelta(card.tps, cmpTps, true) : null;
+                    const dPerM = card.isNew ? analysisDelta(card.perM, cmpPerM, false) : null;
+                    return (
+                      <div key={card.key} className="card" style={{ background: "#141225" }}>
+                        <div className="card-pad" style={{ padding: 21 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#e8e6f0", marginBottom: 12 }}>{card.title}</div>
+                          {sectionTitle("TCO 비교")}
+                          {metricBlock("시간당 TCO", card.tco === null ? null : toDisplay(card.tco), "primary", dTco)}
+                          {metricBlock("일당 TCO", card.tco === null ? null : toDisplay(card.tco * 24), "secondary")}
+                          {metricBlock("월당 TCO", card.tco === null ? null : toDisplay(card.tco * 24 * 30), "secondary")}
+                          {sectionTitle("TPS 비교")}
+                          {metricBlock("", card.tps === null ? null : card.tps, "secondary", dTps, true)}
+                          {sectionTitle("1M 토큰당 단가 비교")}
+                          {metricBlock("", card.perM === null ? null : toDisplay(card.perM), "secondary", dPerM, true)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
 function ClusterTab({ sub }) {
     return sub === "k8s" ? <K8sPanel /> : <OsProvisioningPanel />;
   }
@@ -10314,6 +11520,7 @@ function ClusterTab({ sub }) {
 
   function App() {
     const [tab, setTab] = useState("dashboard");
+    const [dashboardSub, setDashboardSub] = useState("results");
     const [clusterSub, setClusterSub] = useState("os");
     const [trainingSub, setTrainingSub] = useState("mlperf");
     const [inferenceSub, setInferenceSub] = useState("mlperf");
@@ -10954,7 +12161,7 @@ function ClusterTab({ sub }) {
 
     return (
       <div className="app-shell surface">
-        <Sidebar tab={tab} setTab={setTab} clusterSub={clusterSub} setClusterSub={setClusterSub} trainingSub={trainingSub} setTrainingSub={setTrainingSub} inferenceSub={inferenceSub} setInferenceSub={setInferenceSub} runningCount={runningCount} testStatus={testStatus} onAckTestStatus={onAckTestStatus} />
+        <Sidebar tab={tab} setTab={setTab} dashboardSub={dashboardSub} setDashboardSub={setDashboardSub} clusterSub={clusterSub} setClusterSub={setClusterSub} trainingSub={trainingSub} setTrainingSub={setTrainingSub} inferenceSub={inferenceSub} setInferenceSub={setInferenceSub} runningCount={runningCount} testStatus={testStatus} onAckTestStatus={onAckTestStatus} />
 
         <div className="min-w-0 grid-bg">
           {/* CONTENT HEADER */}
@@ -10964,6 +12171,13 @@ function ClusterTab({ sub }) {
                 <h1 className="text-lg font-semibold tracking-tight text-fog-100">{pageMeta.title}</h1>
                 {pageMeta.sub && <p className="text-[12px] text-fog-500 mt-0.5">{pageMeta.sub}</p>}
               </div>
+              {tab === "dashboard" && (
+                <div className="seg">
+                  <button className={"seg-btn" + (dashboardSub === "results" ? " active" : "")} onClick={() => setDashboardSub("results")}>테스트 결과</button>
+                  <button className={"seg-btn" + (dashboardSub === "perf" ? " active" : "")} onClick={() => setDashboardSub("perf")}>가속기별 성능</button>
+                  <button className={"seg-btn" + (dashboardSub === "cost" ? " active" : "")} onClick={() => setDashboardSub("cost")}>비용 분석</button>
+                </div>
+              )}
               {tab === "cluster" && (
                 <div className="seg">
                   <button className={"seg-btn" + (clusterSub === "os" ? " active" : "")} onClick={() => setClusterSub("os")}>클러스터 관리</button>
@@ -11103,9 +12317,11 @@ function ClusterTab({ sub }) {
               </div>
             )}
 
-            {tab === "dashboard" && (
+            {tab === "dashboard" && dashboardSub === "results" && (
               <DashboardTab pinned={pinned} setPinned={setPinned} onDeleteRun={deleteRunEverywhere} />
             )}
+            {tab === "dashboard" && dashboardSub === "perf" && <AcceleratorPerfTab />}
+            {tab === "dashboard" && dashboardSub === "cost" && <CostAnalysisTab pinned={pinned} />}
           </main>
 
           <footer className="px-7 py-6 text-[10px] text-fog-500 font-mono uppercase tracking-[0.18em]">
