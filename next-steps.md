@@ -3,34 +3,36 @@
 `Errors`에 올라온 최신 증상에 대해 **지금 실행할 커맨드**만 모아둔 파일입니다.
 `Errors`가 갱신되면 이 파일도 갱신됩니다.
 
-- 갱신: 2026-08-26
+- 갱신: 2026-08-26 (2회차)
 - 대상 증상: training v5.1 단일노드 실행 중 UCX segfault
 
 ---
 
-## 상황
+## 지난 회차에서 좁혀진 것
 
-단일노드 실행이 **분산 초기화 직전까지 정상 진행**된 뒤 컨테이너 안에서 죽었습니다.
+| 확인 | 결과 |
+|---|---|
+| IB NIC 상태 | 전부 ACTIVE / link up — **호스트 IB 정상** |
+| 컨테이너에서 `ucx_info -d` | IB 장치 유무와 무관하게 **크래시 없이 실행됨** |
+| 런처 코드 | 원본 zip 대비 실행 경로 변경 없음 |
+
+UCX 초기화 자체는 멀쩡합니다. 따라서 "UCX가 통째로 깨졌다"는 가설은 탈락입니다.
+
+**다만 지난 테스트는 `head -40`에 잘려서 `self` transport까지만 보였습니다.**
+IB transport(`rc_mlx5`, `dc_mlx5`)가 목록에 있는지, 그게 정상인지는 아직 못 봤습니다.
+
+그리고 로그에 새 단서가 나왔습니다.
 
 ```
-Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
- 0  /opt/hpcx/ucx/lib/libucs.so.0(ucs_handle_error+0x2e4)
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not detected.
 ```
 
-MLLOG init, `GPU available: True`, NeMo experiment 디렉터리 생성, `global_batch_size: 128`까지
-찍혔으므로 런처가 넘긴 인자·경로·이미지는 모두 정상입니다. HPC-X의 UCX에서 터졌습니다.
-
-**`NCCL_IB_DISABLE=1`로는 회피되지 않습니다.** 그 변수는 NCCL에만 적용되고 UCX는 별개 스택이라
-계속 IB transport를 잡으려 합니다.
-
-`mlperf_train_v51.sh:1123`이 호스트에 `/dev/infiniband`가 있으면 전부 컨테이너에 넘깁니다.
-단일노드는 IB가 필요 없는데도 UCX가 그 장치를 열다 죽는 정황입니다.
+`nvidia_peermem` 커널 모듈이 안 올라와 있습니다. GPUDirect RDMA용 모듈이고, 이게 없는 상태에서
+UCX가 GPU 메모리를 IB로 등록하려 하면 죽을 수 있습니다. **현재 1순위 용의자입니다.**
 
 ---
 
 ## 준비
-
-아래 커맨드에서 쓸 노드 주소를 먼저 지정하세요.
 
 ```bash
 NODE=<대상 노드 IP 또는 호스트명>
@@ -39,94 +41,114 @@ IMAGE=donnmyth/mlperf-nvidia:llama2_70b_lora-pyt-sm90
 
 ---
 
-## STEP 1 — 노드의 IB 스택 상태
-
-호스트 IB가 정상인지부터 봅니다. 여기서 깨져 있으면 스크립트로 우회할 문제가 아닙니다.
+## STEP 1 — `nvidia_peermem` 확인 및 로드  ← 최우선
 
 ```bash
-ssh $NODE 'ibv_devinfo'
-ssh $NODE 'ibstat'
-ssh $NODE 'ls -l /dev/infiniband/'
-ssh $NODE 'ibdev2netdev'
+ssh $NODE 'lsmod | grep -iE "nvidia_peermem|nv_peer_mem"'
 ```
 
-**판정**
+아무것도 안 나오면 로드합니다.
 
-| 결과 | 의미 |
-|---|---|
-| `ibv_devinfo`가 segfault / 아무것도 출력 안 함 | 호스트 IB 스택 문제 → STEP 3으로 우회 후 인프라 담당자에게 |
-| 포트가 `PORT_DOWN` / `INIT` | 케이블·서브넷 매니저 문제 → 단일노드는 STEP 3으로 진행 가능 |
-| 포트가 `PORT_ACTIVE` 인데도 컨테이너에서 죽음 | 이미지 ↔ 노드 IB 조합 문제 → STEP 2로 |
-| `/dev/infiniband/` 자체가 없음 | IB 미구성. 그러면 segfault 원인은 다른 곳 → STEP 2 결과 필요 |
+```bash
+ssh $NODE 'modprobe nvidia_peermem && lsmod | grep -i peermem'
+```
+
+로드에 실패하면 메시지를 그대로 `Errors`에 남겨주세요 (드라이버 버전 불일치일 수 있습니다).
+
+로드에 성공했으면 **바로 STEP 4로 가서 실제 실행을 재시도**하세요. 이것만으로 해결될 수 있습니다.
 
 ---
 
-## STEP 2 — 컨테이너 안에서 UCX가 무엇을 잡는지
+## STEP 2 — UCX transport 전체 목록 (잘림 없이)
 
-호스트가 아니라 컨테이너 안에서 재현되는지 확인합니다. 벤치마크 없이 UCX만 건드립니다.
+지난번 `head -40` 때문에 못 본 부분입니다. IB transport가 잡히는지 봅니다.
 
 ```bash
 ssh $NODE "docker run --rm --gpus all \
   \$(for d in /dev/infiniband/*; do echo --device \$d:\$d; done) \
-  $IMAGE bash -c 'ucx_info -d 2>&1 | head -40'"
+  $IMAGE bash -c 'ucx_info -d 2>&1' " | grep -E "^# (Memory domain|Transport|Device):" 
 ```
 
-여기서도 segfault면 **이미지와 노드 IB 조합 문제로 확정**입니다.
+기대: `rc_verbs` / `rc_mlx5` / `dc_mlx5`와 `mlx5_*` 디바이스가 보여야 합니다.
+`self` / `tcp` / `sm`만 보이면 컨테이너가 IB를 아예 못 잡고 있는 것입니다.
 
-IB 장치를 빼고 같은 것을 실행해 비교합니다. 이쪽이 정상이면 원인이 IB 패스스루로 좁혀집니다.
-
-```bash
-ssh $NODE "docker run --rm --gpus all $IMAGE bash -c 'ucx_info -d 2>&1 | head -40'"
-```
-
----
-
-## STEP 3 — 공유메모리 전용으로 우회 시도
-
-단일노드는 IB가 필요 없으므로 UCX를 shared memory + CUDA IPC로 제한하면 넘어갈 수 있습니다.
-아래는 **스크립트를 거치지 않고** docker를 직접 띄워 격리 확인하는 방법입니다.
+GPU 메모리 등록이 되는지도 함께 봅니다 (peermem 여부가 여기 반영됩니다).
 
 ```bash
 ssh $NODE "docker run --rm --gpus all \
-  -e UCX_TLS=sm,self,cuda_copy,cuda_ipc \
-  -e UCX_NET_DEVICES=all \
-  $IMAGE bash -c 'ucx_info -d 2>&1 | head -20'"
+  \$(for d in /dev/infiniband/*; do echo --device \$d:\$d; done) \
+  $IMAGE bash -c 'ucx_info -d 2>&1 | grep -A3 cuda'"
 ```
-
-이게 통과하면 `UCX_TLS`를 컨테이너로 전달하도록 런처를 수정하면 됩니다.
-현재는 `build_env_exports` 허용목록에 없어서 전달되지 않습니다 — **알려주시면 넣겠습니다.**
 
 ---
 
-## STEP 4 — 결과 회신
+## STEP 3 — UCX를 공유메모리로 제한해서 실제 실행
 
-STEP 1~3 출력을 `Errors`에 붙여넣어 주세요. 특히 다음 세 가지가 판정에 필요합니다.
+**이제 `UCX_TLS`가 컨테이너까지 전달됩니다** (커밋 `3e4e390`에서 추가).
+단일노드는 IB가 필요 없으므로 이 조합이면 UCX가 IB를 아예 안 건드립니다.
 
-1. `ibv_devinfo`의 `state` 줄 (`PORT_ACTIVE` / `PORT_DOWN` / 크래시 여부)
-2. STEP 2의 두 실행 결과 차이 (IB 장치 있을 때 vs 없을 때)
-3. STEP 3이 통과했는지
+먼저 코드를 최신으로 맞추세요.
 
-이 결과에 따라 다음 중 하나로 진행합니다.
+```bash
+cd /mgmt/server/poc-platform/poc-platform-pub
+git pull
+```
 
-- IB 장치 유무가 갈림 → 단일노드에서 `/dev/infiniband` 패스스루를 건너뛰는 `--no-ib` 옵션 추가
-- `UCX_TLS`로 우회됨 → UCX 계열 변수를 허용목록에 추가
-- 컨테이너 무관하게 호스트에서 크래시 → 스크립트 수정 대상 아님. 노드 IB 재구성 필요
+그리고 실행합니다.
+
+```bash
+UCX_TLS=sm,self,cuda_copy,cuda_ipc \
+UCX_LOG_LEVEL=warn \
+./scripts/run_single_node.sh --host $NODE --tp 8 --pp 1 --mbs 1 --gbs 128 --max-steps 10
+```
+
+전달됐는지는 로그의 `[INFO] advanced env forwarded:` 줄에 `UCX_TLS`가 있는지로 확인됩니다.
+
+이걸로 통과하면 원인은 **UCX의 IB 경로**로 확정됩니다.
+
+---
+
+## STEP 4 — 원래 설정으로 재시도
+
+STEP 1에서 `nvidia_peermem`을 올렸다면, 우회 없이 그대로 됩니다.
+
+```bash
+./scripts/run_single_node.sh --host $NODE --tp 8 --pp 1 --mbs 1 --gbs 128 --max-steps 10
+```
+
+---
+
+## STEP 5 — 결과 회신
+
+`Errors`에 다음을 붙여주세요.
+
+1. STEP 1의 `lsmod` 결과와 `modprobe` 성공/실패
+2. STEP 2의 Transport/Device 목록 (`mlx5`가 보이는지)
+3. STEP 3이 통과했는지 — 통과했다면 어디까지 진행됐는지 (step 로그가 찍히는지)
+4. STEP 4 재시도 결과
+
+판정 후 다음 중 하나로 진행합니다.
+
+- `nvidia_peermem` 로드로 해결 → 노드 부팅 시 자동 로드하도록 안내
+- `UCX_TLS` 우회로만 해결 → 단일노드에서 `/dev/infiniband` 패스스루를 건너뛰는 `--no-ib` 옵션 추가
+- 둘 다 안 됨 → 컨테이너 안에서 `torchrun` 최소 재현 스크립트로 범위 축소
 
 ---
 
 ## 이미 확인된 것 (다시 볼 필요 없음)
 
-원본 zip 대비 런처 변경분을 git으로 대조했습니다.
+**런처는 원본 그대로입니다.** 원본 zip(`32fd75b`) 대비 git diff 결과:
 
 | 파일 | 원본 대비 |
 |---|---|
 | `scripts/mlperf_run.sh` | 변경 없음 |
 | `scripts/common.sh` | 변경 없음 |
-| `scripts/mlperf_train_v51.sh` | +23줄 — 전부 docker tar 폴백과 주석 |
-| `scripts/mlperf_train_v41.sh` | +38/-4 — B300 게이팅과 tar 폴백 |
+| `scripts/mlperf_train_v51.sh` | docker tar 폴백 + UCX env 전달만 추가 |
+| `scripts/mlperf_train_v41.sh` | B300 게이팅 + tar 폴백 + UCX env 전달 |
 
-v5.1 실행 경로에서 추가된 기능은 tar 폴백 하나뿐이고, 기본 경로에 tar가 없을 때만 동작합니다.
-이번 crash와 무관합니다.
+**컨테이너 실행 인자도 정상입니다.** `--ipc=host`, `--ulimit memlock=-1`,
+`--ulimit stack=67108864`, `--network=host`, `--gpus all`을 모두 넘기고 있습니다.
+지난 로그의 SHMEM 경고는 진단용으로 직접 띄운 `docker run`에서 나온 것이라 실제 실행과 무관합니다.
 
 ---
 
