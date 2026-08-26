@@ -792,6 +792,25 @@ export MASTER_PORT="${MASTER_PORT:-29500}"
 export CUDA_DEVICE_MAX_CONNECTIONS="${CUDA_DEVICE_MAX_CONNECTIONS:-1}"
 export NCCL_DEBUG="${NCCL_DEBUG:-WARN}"
 
+# The HPC-X plugin that this image injects into NCCL
+# (/opt/hpcx/nccl_rdma_sharp_plugin/lib/libnccl-net.so, logged as "NCCL RDMA
+# Plugin v10") segfaults inside ncclCommInitRankConfig on B300 with the
+# NCCL 2.28.3 shipped here. It reproduces with a single rank, before any
+# collective runs, so it is not a topology, NVLink or multi-GPU problem --
+# scripts/nccl_probe.sh reproduces and clears it in about thirty seconds.
+#
+# Disabling the external plugin makes NCCL fall back to its own IB/RDMA
+# transport, which is correct on one node and across nodes alike. What is
+# given up is SHARP in-network reduction, so multi-node allreduce is slower
+# than it could be -- but it runs, which the plugin does not.
+#
+# Scoped to B300 because that is where the crash is demonstrated; other GPU
+# types keep the plugin. Set NCCL_NET_PLUGIN yourself to override either way.
+if [[ "${MLPERF_GPU_TYPE:-}" == "B300" && -z "${NCCL_NET_PLUGIN:-}" ]]; then
+  export NCCL_NET_PLUGIN="none"
+  echo "[CONTAINER] B300: NCCL_NET_PLUGIN=none (HPC-X plugin crashes ncclCommInitRankConfig; using NCCL built-in IB, no SHARP)"
+fi
+
 validate_training_parallel_config() {
   for v in MLPERF_NUM_GPUS MLPERF_WORLD_SIZE DGXNNODES TP PP CP MBS GBS; do
     [[ "${!v:-}" =~ ^[0-9]+$ ]] || { echo "[CONTAINER][ERROR] $v must be a positive integer: ${!v:-}" >&2; exit 70; }
