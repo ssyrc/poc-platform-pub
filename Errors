@@ -51,3 +51,149 @@
 [node19]  2  /opt/hpcx/ucx/lib/libucs.so.0(+0x37ba8) [0x7fed8acaab                                                                                a8]
 [node19]  3  /lib/x86_64-linux-gnu/libc.so.6(+0x45330) [0x7fedc268                                                                                3330]
 
+
+
+
+
+[root@node-26043 poc-platform-pub]# ssh $NODE "docker run --rm --gpus all \
+  \$(for d in /dev/infiniband/*; do echo --device \$d:\$d; done) \
+  $IMAGE bash -c 'ucx_info -d 2>&1 | head -40'"
+Warning: Permanently added 'node19' (ED25519) to the list of known hosts.
+
+=============
+== PyTorch ==
+=============
+
+NVIDIA Release 25.09 (build 210907837)
+PyTorch Version 2.9.0a0+50eac81
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+NOTE: The SHMEM allocation limit is set to the default of 64MB.  This may be
+   insufficient for PyTorch.  NVIDIA recommends the use of the following flags:
+   docker run --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 ...
+
+#
+# Memory domain: self
+#     Component: self
+#             register: unlimited, cost: 0 nsec
+#           remote key: 0 bytes
+#           rkey_ptr is supported
+#         memory types: host (access,reg_nonblock,reg,cache)
+#
+#      Transport: self
+#         Device: memory
+#           Type: loopback
+#  System device: <unknown>
+#
+#      capabilities:
+#            bandwidth: 0.00/ppn + 19360.00 MB/sec
+#              latency: 0 nsec
+#             overhead: 10 nsec
+#            put_short: <= 4294967295
+#            put_bcopy: unlimited
+#            get_bcopy: unlimited
+#             am_short: <= 8K
+#             am_bcopy: <= 8K
+#               domain: cpu
+#           atomic_add: 32, 64 bit
+#           atomic_and: 32, 64 bit
+#            atomic_or: 32, 64 bit
+#           atomic_xor: 32, 64 bit
+#          atomic_fadd: 32, 64 bit
+#          atomic_fand: 32, 64 bit
+#           atomic_for: 32, 64 bit
+#          atomic_fxor: 32, 64 bit
+#          atomic_swap: 32, 64 bit
+#         atomic_cswap: 32, 64 bit
+#           connection: to iface
+#      device priority: 0
+#     device num paths: 1
+#              max eps: inf
+#       device address: 0 bytes
+#        iface address: 8 bytes
+#       error handling: ep_check
+
+
+
+[root@node-26043 poc-platform-pub]# ssh $NODE "docker run --rm --gpus all \
+  -e UCX_TLS=sm,self,cuda_copy,cuda_ipc \
+  -e UCX_NET_DEVICES=all \
+  $IMAGE bash -c 'ucx_info -d 2>&1 | head -20'"
+Warning: Permanently added 'node19' (ED25519) to the list of known hosts.
+
+=============
+== PyTorch ==
+=============
+
+NVIDIA Release 25.09 (build 210907837)
+PyTorch Version 2.9.0a0+50eac81
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+NOTE: The SHMEM allocation limit is set to the default of 64MB.  This may be
+   insufficient for PyTorch.  NVIDIA recommends the use of the following flags:
+   docker run --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 ...
+
+#
+# Memory domain: self
+#     Component: self
+#             register: unlimited, cost: 0 nsec
+#           remote key: 0 bytes
+#           rkey_ptr is supported
+#         memory types: host (access,reg_nonblock,reg,cache)
+#
+#      Transport: self
+#         Device: memory
+#           Type: loopback
+#  System device: <unknown>
+#
+#      capabilities:
+#            bandwidth: 0.00/ppn + 19360.00 MB/sec
+#              latency: 0 nsec
+#             overhead: 10 nsec
+#            put_short: <= 4294967295
+#            put_bcopy: unlimited
+#            get_bcopy: unlimited
