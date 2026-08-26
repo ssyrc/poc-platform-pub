@@ -133,3 +133,6 @@ PYTHONFAULTHANDLER=1 \
 
 # 멀티노드 NCCL 은 가능하나, IB/RDMA 경로에서 NCCL 실패함
 # Socket 방식으로 NCCL collective 16 GPU 확인
+
+
+# 두 서버간 ib_write_bw 는 되는 상태임
