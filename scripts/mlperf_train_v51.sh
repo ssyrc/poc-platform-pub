@@ -299,6 +299,11 @@ DOCKERIMG_DIR="${DATA_ROOT}/dockerimgs"
 LLAMA2_REPO="${MLPERF_ROOT}/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo"
 LLAMA2_IMAGE_SM90="${DOCKER_HUB_IMAGE_PREFIX:-docker.io}/donnmyth/mlperf-nvidia:llama2_70b_lora-pyt-sm90"
 LLAMA2_TAR_SM90="${DOCKERIMG_DIR}/mlperf-nvidia_llama2_70b_lora-pyt-sm90.tar.gz"
+# Untagged upstream default covers sm_100/sm_103 (B200/GB200/GB300); the -sm90
+# tag is the one that adds Hopper. Blackwell parts therefore take this image,
+# not the sm90 one.
+LLAMA2_IMAGE_BLACKWELL="${DOCKER_HUB_IMAGE_PREFIX:-docker.io}/donnmyth/mlperf-nvidia:llama2_70b_lora-pyt"
+LLAMA2_TAR_BLACKWELL="${DOCKERIMG_DIR}/mlperf-nvidia_llama2_70b_lora-pyt.tar.gz"
 LLAMA2_DATA_DIR="${DATA_ROOT}/training_llama2_70b_lora/data"
 LLAMA2_MODEL_DIR="${DATA_ROOT}/training_llama2_70b_lora/model"
 
@@ -570,7 +575,11 @@ case "$BENCHMARK" in
         DOCKER_IMAGE="$USER_DOCKER_IMAGE"
         FALLBACK_TAR=""
         ;;
-      V100|A100|H100|B300|RTX6000|RTX_PRO_6000)
+      B300)
+        DOCKER_IMAGE="${USER_DOCKER_IMAGE:-$LLAMA2_IMAGE_BLACKWELL}"
+        FALLBACK_TAR="$LLAMA2_TAR_BLACKWELL"
+        ;;
+      V100|A100|H100|RTX6000|RTX_PRO_6000)
         DOCKER_IMAGE="${USER_DOCKER_IMAGE:-$LLAMA2_IMAGE_SM90}"
         FALLBACK_TAR="$LLAMA2_TAR_SM90"
         ;;
