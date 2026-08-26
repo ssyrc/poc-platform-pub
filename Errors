@@ -183,73 +183,88 @@ Build cuda_13.0.r13.0/compiler.36424714_0
 
 
 ### llama31_8b 에러
-[node25] Error executing job with overrides: ['++trainer.devices=8', '++trainer.num_nodes=1', '++trainer.max_steps=10', '++trainer.limit_val_batches=1', '++trainer.val_check_interval=10', '++trainer.log_every_n_steps=1', '++trainer.enable_progress_bar=true', '++trainer.precision=bf16-mixed', '++model.base_config=8b', '++model.tokenizer.model=/preproc_data/tokenizer', '++model.data.mock_dataset=false', '++model.tensor_model_parallel_size=8', '++model.pipeline_model_parallel_size=1', '++model.context_parallel_size=1', '++model.micro_batch_size=1', '++model.global_batch_size=128', '++model.encoder_seq_length=8192', '++model.optim.lr=0.0008', '++model.optim.sched.warmup_steps=2', '++model.custom.target_log_ppl=3.3', '++model.fp8=False', '++model.fp8_hybrid=False', '++exp_manager.explicit_log_dir=/opt/poc-platform/mlperf_logs_train_v51/20260827_035547_node25_training_v5.1_llama31_8b_trainingv51_single_20260827_035545/results', '++model.virtual_pipeline_model_parallel_size=null']
-[node25] Traceback (most recent call last):
-[node25]   File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 751, in <module>
-[node25] Error executing job with overrides: ['++trainer.devices=8', '++trainer.num_nodes=1', '++trainer.max_steps=10', '++trainer.limit_val_batches=1', '++trainer.val_check_interval=10', '++trainer.log_every_n_steps=1', '++trainer.enable_progress_bar=true', '++trainer.precision=bf16-mixed', '++model.base_config=8b', '++model.tokenizer.model=/preproc_data/tokenizer', '++model.data.mock_dataset=false', '++model.tensor_model_parallel_size=8', '++model.pipeline_model_parallel_size=1', '++model.context_parallel_size=1', '++model.micro_batch_size=1', '++model.global_batch_size=128', '++model.encoder_seq_length=8192', '++model.optim.lr=0.0008', '++model.optim.sched.warmup_steps=2', '++model.custom.target_log_ppl=3.3', '++model.fp8=False', '++model.fp8_hybrid=False', '++exp_manager.explicit_log_dir=/opt/poc-platform/mlperf_logs_train_v51/20260827_035547_node25_training_v5.1_llama31_8b_trainingv51_single_20260827_035545/results', '++model.virtual_pipeline_model_parallel_size=null']
-[node25]     main()
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/main.py", line 94, in decorated_main
-[node25] Traceback (most recent call last):
-[node25]   File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 751, in <module>
-[node25]     _run_hydra(
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 394, in _run_hydra
-[node25]     _run_app(
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 457, in _run_app
-[node25]     run_and_report(
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 223, in run_and_report
-[node25]     raise ex
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 220, in run_and_report
-[node25]         return func()main()
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439259, "event_type": "POINT_IN_TIME", "key": "submission_benchmark", "value": "llama31_8b", "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 566}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439259, "event_type": "POINT_IN_TIME", "key": "submission_org", "value": "SUBMISSION_ORG_PLACEHOLDER", "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 566}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439259, "event_type": "POINT_IN_TIME", "key": "submission_division", "value": "closed", "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 566}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439259, "event_type": "POINT_IN_TIME", "key": "submission_status", "value": "onprem", "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 566}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439259, "event_type": "POINT_IN_TIME", "key": "submission_platform", "value": "1xSUBMISSION_PLATFORM_PLACEHOLDER", "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 566}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439260, "event_type": "POINT_IN_TIME", "key": "seed", "value": 1234, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439260, "event_type": "POINT_IN_TIME", "key": "global_batch_size", "value": 128, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439260, "event_type": "POINT_IN_TIME", "key": "gradient_accumulation_steps", "value": 128.0, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439260, "event_type": "POINT_IN_TIME", "key": "max_sequence_length", "value": 8192, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439260, "event_type": "POINT_IN_TIME", "key": "eval_samples", "value": 0, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439260, "event_type": "POINT_IN_TIME", "key": "train_samples", "value": 1574207408, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439261, "event_type": "POINT_IN_TIME", "key": "init_checkpoint_step", "value": 0, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439261, "event_type": "POINT_IN_TIME", "key": "opt_name", "value": "adamw", "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439261, "event_type": "POINT_IN_TIME", "key": "opt_base_learning_rate", "value": 0.0008, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439261, "event_type": "POINT_IN_TIME", "key": "opt_adamw_beta_1", "value": 0.9, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439261, "event_type": "POINT_IN_TIME", "key": "opt_adamw_beta_2", "value": 0.95, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439261, "event_type": "POINT_IN_TIME", "key": "opt_adamw_epsilon", "value": 1e-05, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439261, "event_type": "POINT_IN_TIME", "key": "opt_adamw_weight_decay", "value": 0.1, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439262, "event_type": "POINT_IN_TIME", "key": "opt_gradient_clip_norm", "value": 1.0, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439262, "event_type": "POINT_IN_TIME", "key": "opt_end_learning_rate", "value": 8e-05, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439262, "event_type": "POINT_IN_TIME", "key": "opt_learning_rate_warmup_steps", "value": 2, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439262, "event_type": "POINT_IN_TIME", "key": "opt_learning_rate_decay_steps", "value": -2, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439262, "event_type": "POINT_IN_TIME", "key": "max_steps", "value": 0, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439262, "event_type": "POINT_IN_TIME", "key": "opt_learning_rate_decay_schedule", "value": "cosine with linear warmup", "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] :::MLLOG {"namespace": "", "time_ms": 1787771439262, "event_type": "POINT_IN_TIME", "key": "target_accuracy", "value": 3.3, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", "lineno": 601}}
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] ======== Benchmarked fit ========
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] Experiments will be logged at /mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/nemo_experiments/default/2026-08-26_19-10-39
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] Rank 0 has data parallel group : [0]
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] Rank 0 has combined group of data parallel and context parallel : [0]
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] All data parallel group ranks with context parallel combined: [[0], [1], [2], [3], [4], [5], [6], [7]]
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] Ranks 0 has data parallel rank: 0
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] Rank 0 has context parallel group: [0]
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] All context parallel group ranks: [[0], [1], [2], [3], [4], [5], [6], [7]]
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] Ranks 0 has context parallel rank: 0
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] Rank 0 has model parallel group: [0, 1, 2, 3, 4, 5, 6, 7]
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] All model parallel group ranks: [[0, 1, 2, 3, 4, 5, 6, 7]]
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] Rank 0 has tensor model parallel group: [0, 1, 2, 3, 4, 5, 6, 7]
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] All tensor model parallel group ranks: [[0, 1, 2, 3, 4, 5, 6, 7]]
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] Rank 0 has tensor model parallel rank: 0
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] All expert tensor parallel group ranks: [[0, 1, 2, 3, 4, 5, 6, 7]]
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] Rank 0 has expert tensor parallel rank: 0
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] Rank 0 has pipeline model parallel group: [0]
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] Rank 0 has embedding group: [0]
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] All pipeline model parallel group ranks: [[0], [1], [2], [3], [4], [5], [6], [7]]
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] Rank 0 has pipeline model parallel rank 0
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] All embedding group ranks: [[0], [1], [2], [3], [4], [5], [6], [7]]
+[node25] [NeMo I 2026-08-26 19:10:39 nemo_logging:393] Rank 0 has embedding rank: 0
+[node25] [AUX I 2026-08-26 19:10:39 megatron_strategy:607] Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/8
+[node25] ----------------------------------------------------------------------------------------------------
+[node25] distributed_backend=nccl
+[node25] All distributed processes registered. Starting with 8 processes
+[node25] ----------------------------------------------------------------------------------------------------
 [node25]
-[node25]      File "/usr/local/lib/python3.12/dist-packages/hydra/main.py", line 94, in decorated_main
-[node25]            _run_hydra(
-[node25] ^^  File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 394, in _run_hydra
-[node25] ^^^^
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 458, in <lambda>
-[node25]     _run_app(
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 457, in _run_app
-[node25]     lambda: hydra.run(
-[node25]        run_and_report(
-[node25]     File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 223, in run_and_report
-[node25]           raise ex^
-[node25] ^^^  File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 220, in run_and_report
-[node25] ^^^    return func()^
-[node25] ^^
-[node25]     File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/hydra.py", line 132, in run
-[node25]             _ = ret.return_value
-[node25] ^^^^^ ^
-[node25]     File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 458, in <lambda>
-[node25]     ^^^^    lambda: hydra.run(^
-[node25] ^^ ^ ^ ^ ^ ^ ^ ^ ^  ^
-[node25]  ^  File "/usr/local/lib/python3.12/dist-packages/hydra/core/utils.py", line 260, in return_value
-[node25] ^^^^^^^^    ^raise self._return_value
-[node25]
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/hydra.py", line 132, in run
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/core/utils.py", line 186, in run_job
-[node25]     _ = ret.return_value
-[node25]     ret.return_value = task_function(task_cfg)
-[node25]           ^ ^  ^ ^ ^^ ^ ^ ^ ^ ^ ^^ ^ ^ ^
-[node25]      File "/usr/local/lib/python3.12/dist-packages/hydra/core/utils.py", line 260, in return_value
-[node25]   ^^^    ^raise self._return_value^
-[node25] ^^^^  File "/usr/local/lib/python3.12/dist-packages/hydra/core/utils.py", line 186, in run_job
-[node25] ^^^^^^    ^ret.return_value = task_function(task_cfg)^
-[node25] ^^^ ^ ^ ^
-[node25]     File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 657, in main
-[node25]             Error executing job with overrides: ['++trainer.devices=8', '++trainer.num_nodes=1', '++trainer.max_steps=10', '++trainer.limit_val_batches=1', '++trainer.val_check_interval=10', '++trainer.log_every_n_steps=1', '++trainer.enable_progress_bar=true', '++trainer.precision=bf16-mixed', '++model.base_config=8b', '++model.tokenizer.model=/preproc_data/tokenizer', '++model.data.mock_dataset=false', '++model.tensor_model_parallel_size=8', '++model.pipeline_model_parallel_size=1', '++model.context_parallel_size=1', '++model.micro_batch_size=1', '++model.global_batch_size=128', '++model.encoder_seq_length=8192', '++model.optim.lr=0.0008', '++model.optim.sched.warmup_steps=2', '++model.custom.target_log_ppl=3.3', '++model.fp8=False', '++model.fp8_hybrid=False', '++exp_manager.explicit_log_dir=/opt/poc-platform/mlperf_logs_train_v51/20260827_035547_node25_training_v5.1_llama31_8b_trainingv51_single_20260827_035545/results', '++model.virtual_pipeline_model_parallel_size=null']
-[node25]     ^^^^^^^^^^^^^^^^^^^^^^^
-[node25]   File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 657, in main
-[node25]     model, precision = get_model_with_precision(cfg, data.tokenizer)
-[node25]                        ^^^^Traceback (most recent call last):
-[node25] ^^^^  File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 751, in <module>
-[node25] ^    ^model, precision = get_model_with_precision(cfg, data.tokenizer)^^
-[node25] ^^^^ ^ ^ ^ ^ ^ ^ ^  ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^  ^^^^^^^^^^^^^^^^^^
-[node25] ^^  File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 291, in get_model_with_precision
-[node25] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^    ^^main()^
-[node25]
-[node25]     assert False, f"Unsupported precision {config.trainer.precision}"  File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 291, in get_model_with_precision
-[node25]
-[node25]    File "/usr/local/lib/python3.12/dist-packages/hydra/main.py", line 94, in decorated_main
-[node25]               ^_run_hydra(^
-[node25] ^^^  File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 394, in _run_hydra
-[node25]
-[node25] AssertionError: Unsupported precision bf16-mixed
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] NCCL version 2.28.3+cuda13.0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [node-26049:319  :0:319] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[node25] ==== backtrace (tid:    319) ====
+[node25]  0  /opt/hpcx/ucx/lib/libucs.so.0(ucs_handle_error+0x2e4) [0x7f8d988aa774]
+[node25]  1  /opt/hpcx/ucx/lib/libucs.so.0(+0x3796a) [0x7f8d988aa96a]
+[node25]  2  /opt/hpcx/ucx/lib/libucs.so.0(+0x37ba8) [0x7f8d988aaba8]
+[node25]  3  /lib/x86_64-linux-gnu/libc.so.6(+0x45330) [0x7f8dd0846330]
+
