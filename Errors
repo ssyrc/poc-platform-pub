@@ -1,54 +1,91 @@
-[node25] ----------------------------------------------------------------------------------------------------
-[node25] distributed_backend=nccl
-[node25] All distributed processes registered. Starting with 1 processes
-[node25] ----------------------------------------------------------------------------------------------------
-[node25]
-[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node25] NCCL version 2.28.3+cuda13.0
-[node25] Fatal Python error: Segmentation fault
-[node25]
-[node25] Current thread 0x00007fc126063300 (most recent call first):
-[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py", line 2826 in broadcast
-[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py", line 81 in wrapper
-[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py", line 3630 in broadcast_object_list
-[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py", line 81 in wrapper
-[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/strategies/ddp.py", line 307 in broadcast
-[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 1233 in log_dir
-[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 1071 in __setup_profiler
-[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 938 in _run
-[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 574 in _fit_impl
-[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105 in launch
-[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/call.py", line 46 in _call_and_handle_interrupt
-[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 538 in fit
-[node25]   File "/workspace/NeMo/nemo/collections/llm/api.py", line 136 in train
-[node25]   File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 737 in main
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/core/utils.py", line 186 in run_job
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/hydra.py", line 119 in run
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 458 in <lambda>
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 220 in run_and_report
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 457 in _run_app
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 394 in _run_hydra
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/main.py", line 94 in decorated_main
-[node25]   File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 751 in <module>
-[node25]
-[node25] Extension modules: yaml._yaml, numpy.core._multiarray_umath, numpy.core._multiarray_tests, numpy.linalg._umath_linalg, numpy.fft._pocketfft_internal, numpy.random._common, numpy.random.bit_generator, numpy.random._bounded_integers, numpy.random._mt19937, numpy.random.mtrand, numpy.random._philox, numpy.random._pcg64, numpy.random._sfc64, numpy.random._generator, torch._C, torch._C._dynamo.autograd_compiler, torch._C._dynamo.eval_frame, torch._C._dynamo.guards, torch._C._dynamo.utils, torch._C._fft, torch._C._linalg, torch._C._nested, torch._C._nn, torch._C._sparse, torch._C._special, scipy._lib._ccallback_c, scipy.signal._sigtools, scipy.linalg._fblas, scipy.linalg._flapack, _cyutility, scipy._cyutility, scipy.linalg.cython_lapack, scipy.linalg._cythonized_array_utils, scipy.linalg._solve_toeplitz, scipy.linalg._decomp_lu_cython, scipy.linalg._matfuncs_schur_sqrtm, scipy.linalg._matfuncs_expm, scipy.linalg._linalg_pythran, scipy.linalg.cython_blas, scipy.linalg._decomp_update, scipy.sparse._sparsetools, _csparsetools, scipy.sparse._csparsetools, scipy.special._ufuncs_cxx, scipy.special._ellip_harm_2, scipy.special._special_ufuncs, scipy.special._gufuncs, scipy.special._ufuncs, scipy.special._specfun, scipy.special._comb, scipy._lib._uarray._uarray, scipy.signal._max_len_seq_inner, scipy.signal._upfirdn_apply, scipy.signal._spline, scipy.spatial._ckdtree, scipy._lib.messagestream, scipy.spatial._qhull, scipy.spatial._voronoi, scipy.spatial._hausdorff, scipy.spatial._distance_wrap, scipy.spatial.transform._rotation, scipy.spatial.transform._rigid_transform, scipy.interpolate._fitpack, scipy.interpolate._dfitpack, scipy.sparse.linalg._dsolve._superlu, scipy.sparse.linalg._eigen.arpack._arpack, scipy.sparse.linalg._propack._spropack, scipy.sparse.linalg._propack._dpropack, scipy.sparse.linalg._propack._cpropack, scipy.sparse.linalg._propack._zpropack, scipy.optimize._group_columns, scipy.optimize._trlib._trlib, scipy.optimize._lbfgsb, _moduleTNC, scipy.optimize._moduleTNC, scipy.optimize._slsqplib, scipy.optimize._minpack, scipy.optimize._lsq.givens_elimination, scipy.optimize._zeros, scipy.linalg._decomp_interpolative, scipy.optimize._bglu_dense, scipy.optimize._lsap, scipy.optimize._direct, scipy.interpolate._dierckx, scipy.interpolate._ppoly, scipy.interpolate._interpnd, scipy.interpolate._rbfinterp_pythran, scipy.interpolate._rgi_cython, scipy.ndimage._nd_image, scipy.ndimage._rank_filter_1d, _ni_label, scipy.ndimage._ni_label, scipy.signal._sosfilt, scipy.integrate._odepack, scipy.integrate._quadpack, scipy.integrate._vode, scipy.integrate._dop, scipy.integrate._lsoda, scipy.special.cython_special, scipy.stats._stats, scipy.stats._biasedurn, scipy.stats._stats_pythran, scipy.stats._levy_stable.levyst, scipy.stats._ansari_swilk_statistics, scipy.sparse.csgraph._tools, scipy.sparse.csgraph._shortest_path, scipy.sparse.csgraph._traversal, scipy.sparse.csgraph._min_spanning_tree, scipy.sparse.csgraph._flow, scipy.sparse.csgraph._matching, scipy.sparse.csgraph._reordering, scipy.stats._sobol, scipy.stats._qmc_cy, scipy.stats._rcont.rcont, scipy.stats._qmvnt_cy, scipy.signal._peak_finding_utils, PIL._imaging, kiwisolver._cext, charset_normalizer.md, PIL._imagingft, regex._regex, markupsafe._speedups, sentencepiece._sentencepiece, zstandard.backend_c, google._upb._message, _cffi_backend, nvtx._lib.lib, nvtx._lib.profiler, Cython.Plex.Actions, Cython.Plex.Scanners, Cython.Compiler.Scanning, pyarrow.lib, pandas._libs._cyutility, pandas._libs.tslibs.ccalendar, pandas._libs.tslibs.np_datetime, pandas._libs.tslibs.dtypes, pandas._libs.tslibs.base, pandas._libs.tslibs.nattype, pandas._libs.tslibs.timezones, pandas._libs.properties, pandas._libs.tslibs.fields, pandas._libs.tslibs.timedeltas, pandas._libs.tslibs.tzconversion, pandas._libs.tslibs.timestamps, pandas._libs.tslibs.offsets, pandas._libs.tslibs.strptime, pandas._libs.tslibs.parsing, pandas._libs.tslibs.conversion, pandas._libs.tslibs.period, pandas._libs.tslibs.vectorized, pandas._libs.ops_dispatch, pandas._libs.missing, pandas._libs.hashtable, pandas._libs.algos, pandas._libs.interval, pandas._libs.lib, pyarrow._compute, pandas._libs.ops, numexpr.interpreter, pandas._libs.hashing, pandas._libs.arrays, pandas._libs.tslib, pandas._libs.sparse, pandas._libs.internals, pandas._libs.indexing, pandas._libs.index, pandas._libs.writers, pandas._libs.join, pandas._libs.window.aggregations, pandas._libs.window.indexers, pandas._libs.reshape, pandas._libs.groupby, pandas._libs.json, pandas._libs.parsers, pandas._libs.testing, psutil._psutil_linux, psutil._psutil_posix, numcodecs.compat_ext, numcodecs.blosc, numcodecs.zstd, numcodecs.lz4, numcodecs._shuffle, msgpack._cmsgpack, numcodecs.jenkins, numcodecs.vlen, numcodecs.fletcher32, sklearn.__check_build._check_build, sklearn._cyutility, sklearn.utils._isfinite, sklearn.utils.sparsefuncs_fast, sklearn.utils.murmurhash, sklearn.utils._openmp_helpers, sklearn.metrics.cluster._expected_mutual_info_fast, sklearn.preprocessing._csr_polynomial_expansion, sklearn.preprocessing._target_encoder_fast, sklearn.metrics._dist_metrics, sklearn.metrics._pairwise_distances_reduction._datasets_pair, sklearn.utils._cython_blas, sklearn.metrics._pairwise_distances_reduction._base, sklearn.metrics._pairwise_distances_reduction._middle_term_computer, sklearn.utils._heap, sklearn.utils._sorting, sklearn.metrics._pairwise_distances_reduction._argkmin, sklearn.metrics._pairwise_distances_reduction._argkmin_classmode, sklearn.utils._vector_sentinel, sklearn.metrics._pairwise_distances_reduction._radius_neighbors, sklearn.metrics._pairwise_distances_reduction._radius_neighbors_classmode, sklearn.metrics._pairwise_fast, h5py._errors, h5py.defs, h5py._objects, h5py.h5, h5py.utils, h5py.h5t, h5py.h5s, h5py.h5ac, h5py.h5p, h5py.h5r, h5py._proxy, h5py._conv, h5py.h5z, h5py.h5a, h5py.h5d, h5py.h5ds, h5py.h5g, h5py.h5i, h5py.h5o, h5py.h5f, h5py.h5fd, h5py.h5pl, h5py.h5l, h5py._selector, pyarrow._acero, pyarrow._fs, pyarrow._csv, pyarrow._json, pyarrow._substrait, pyarrow._dataset, pyarrow._dataset_orc, pyarrow._parquet, pyarrow._azurefs, pyarrow._hdfs, pyarrow._gcsfs, pyarrow._s3fs, pyarrow._parquet_encryption, pyarrow._dataset_parquet_encryption, pyarrow._dataset_parquet, multidict._multidict, yarl._quoting_c, propcache._helpers_c, aiohttp._http_writer, aiohttp._http_parser, aiohttp._websocket.mask, aiohttp._websocket.reader_c, frozenlist._frozenlist, xxhash._xxhash, zmq.backend.cython._zmq (total: 257)
-[node25] E0826 19:29:02.788000 1 torch/distributed/elastic/multiprocessing/api.py:880] failed (exitcode: -11) local_rank: 0 (pid: 298) of binary: /usr/bin/python
-[node25] Traceback (most recent call last):
-[node25]   File "/usr/local/bin/torchrun", line 7, in <module>
-[node25]     sys.exit(main())
-[node25]              ^^^^^^
-[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 357, in wrapper
-[node25]     return f(*args, **kwargs)
-[node25]            ^^^^^^^^^^^^^^^^^^
-[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 936, in main
-[node25]     run(args)
-[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 927, in run
-[node25]     elastic_launch(
-[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 151, in __call__
-[node25]     return launch_agent(self._config, self._entrypoint, list(args))
-[node25]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 288, in launch_agent
-[node25]     raise ChildFailedError(
-[node25] torch.distributed.elastic.multiprocessing.errors.ChildFailedError:
+[root@node-26049 poc-platform-pub]# NCCL_DEBUG=INFO UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
+./scripts/nccl_probe.sh --host $NODE --image $IMG --gpus 1
+[INFO] host=node25 image=registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell gpus=1
+[INFO] env into container: NCCL_DEBUG=INFO NCCL_IB_DISABLE= NCCL_IB_HCA= NCCL_SOCKET_IFNAME= UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1
+Warning: Permanently added 'node25' (ED25519) to the list of known hosts.
+[REMOTE] nproc_per_node=1
++ docker run --rm --gpus all --network=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 --device /dev/infiniband/issm4 --device /dev/infiniband/issm5 --device /dev/infiniband/issm6 --device /dev/infiniband/issm7 --device /dev/infiniband/rdma_cm --device /dev/infiniband/umad0 --device /dev/infiniband/umad1 --device /dev/infiniband/umad10 --device /dev/infiniband/umad11 --device /dev/infiniband/umad12 --device /dev/infiniband/umad13 --device /dev/infiniband/umad14 --device /dev/infiniband/umad15 --device /dev/infiniband/umad2 --device /dev/infiniband/umad3 --device /dev/infiniband/umad4 --device /dev/infiniband/umad5 --device /dev/infiniband/umad6 --device /dev/infiniband/umad7 --device /dev/infiniband/umad8 --device /dev/infiniband/umad9 --device /dev/infiniband/uverbs0 --device /dev/infiniband/uverbs1 --device /dev/infiniband/uverbs10 --device /dev/infiniband/uverbs11 --device /dev/infiniband/uverbs12 --device /dev/infiniband/uverbs13 --device /dev/infiniband/uverbs14 --device /dev/infiniband/uverbs15 --device /dev/infiniband/uverbs2 --device /dev/infiniband/uverbs3 --device /dev/infiniband/uverbs4 --device /dev/infiniband/uverbs5 --device /dev/infiniband/uverbs6 --device /dev/infiniband/uverbs7 --device /dev/infiniband/uverbs8 --device /dev/infiniband/uverbs9 -v /tmp/tmp.ES4pI52LbN:/probe:ro -e NCCL_DEBUG=INFO -e NCCL_IB_DISABLE= -e NCCL_IB_HCA= -e NCCL_SOCKET_IFNAME= -e UCX_HANDLE_ERRORS=none -e UCX_ERROR_SIGNALS= -e PYTHONFAULTHANDLER=1 registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell torchrun --standalone --nproc_per_node=1 /probe/nccl_probe.py
+
+=============
+== PyTorch ==
+=============
+
+NVIDIA Release 25.09 (build 210907837)
+PyTorch Version 2.9.0a0+50eac81
+Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+Copyright (c) 2014-2024 Facebook Inc.
+Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
+Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
+Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
+Copyright (c) 2011-2013 NYU                      (Clement Farabet)
+Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
+Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
+Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
+Copyright (c) 2015      Google Inc.
+Copyright (c) 2015      Yangqing Jia
+Copyright (c) 2013-2016 The Caffe contributors
+All rights reserved.
+
+Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+
+GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
+and the Product-Specific Terms for NVIDIA AI Products
+(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
+
+NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
+      detected.  Multi-node communication performance may be reduced.
+
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:63: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:63: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+[probe r0] torch 2.9.0a0+50eac811a6.nv25.09  cuda 13.0  nccl 2.27.7
+[probe r0] cuda:0 NVIDIA B300 SXM6 AC sm_103
+[probe r0] init_process_group(nccl) ...
+[probe r0] init_process_group OK
+[probe r0] all_reduce ...
+node-26049:293:293 [0] NCCL INFO Bootstrap: Using bond0.3061:node25<0>
+node-26049:293:293 [0] NCCL INFO cudaDriverVersion 13000
+node-26049:293:293 [0] NCCL INFO NCCL version 2.28.3+cuda13.0
+node-26049:293:293 [0] NCCL INFO Comm config Blocking set to 1
+node-26049:293:293 [0] NCCL INFO NET/Plugin: Loaded net plugin NCCL RDMA Plugin v10 (v10)
+node-26049:293:293 [0] NCCL INFO NET/Plugin: Loaded collnet plugin SHARP (v10)
+node-26049:293:293 [0] NCCL INFO Successfully loaded external network plugin /opt/hpcx/nccl_rdma_sharp_plugin/lib/libnccl-net.so
+node-26049:293:293 [0] NCCL INFO Plugin Path : /opt/hpcx/nccl_rdma_sharp_plugin/lib/libnccl-net.so
+node-26049:293:293 [0] NCCL INFO P2P plugin v10 IBext_v10
+node-26049:293:293 [0] NCCL INFO NET/IB : Using [0]mlx5_0:1/IB/SHARP [1]mlx5_1:1/IB/SHARP [2]mlx5_2:1/RoCE [3]mlx5_3:1/RoCE [4]mlx5_4:1/IB/SHARP [5]mlx5_5:1/IB/SHARP [6]mlx5_6:1/IB/SHARP [7]mlx5_7:1/IB/SHARP [8]mlx5_8:1/IB/SHARP [9]mlx5_9:1/IB/SHARP [10]mlx5_10:1/IB/SHARP [11]mlx5_11:1/IB/SHARP [12]mlx5_12:1/RoCE [13]mlx5_13:1/RoCE [14]mlx5_14:1/IB/SHARP [15]mlx5_15:1/IB/SHARP [RO]; OOB bond0.3061:node25<0>
+node-26049:293:293 [0] NCCL INFO Initialized NET plugin NCCL RDMA Plugin v10
+node-26049:293:293 [0] NCCL INFO Assigned NET plugin NCCL RDMA Plugin v10 to comm
+node-26049:293:293 [0] NCCL INFO Using network NCCL RDMA Plugin v10
+node-26049:293:293 [0] NCCL INFO DMA-BUF is available on GPU device 0
+node-26049:293:293 [0] NCCL INFO ncclCommInitRankConfig comm 0xa39de20 rank 0 nranks 1 cudaDev 0 nvmlDev 0 busId 1a000 commId 0x371bdb1f311d8ec3 - Init START
+node-26049:293:293 [0] NCCL INFO RAS client listening socket at ::1<28028>
+node-26049:293:293 [0] NCCL INFO Bootstrap timings total 0.000593 (create 0.000034, send 0.000103, recv 0.000142, ring 0.000002, delay 0.000001)
+node-26049:293:293 [0] NCCL INFO MNNVL busId 0x1a000 fabric UUID 0.0 cliqueId 0x0 state 3 healthMask 0x80
+Fatal Python error: Segmentation fault
+
+Current thread 0x00007fc1b72dc300 (most recent call first):
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py", line 2926 in all_reduce
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py", line 81 in wrapper
+  File "/probe/nccl_probe.py", line 47 in <module>
+
+Extension modules: numpy.core._multiarray_umath, numpy.core._multiarray_tests, numpy.linalg._umath_linalg, numpy.fft._pocketfft_internal, numpy.random._common, numpy.random.bit_generator, numpy.random._bounded_integers, numpy.random._mt19937, numpy.random.mtrand, numpy.random._philox, numpy.random._pcg64, numpy.random._sfc64, numpy.random._generator, torch._C, torch._C._dynamo.autograd_compiler, torch._C._dynamo.eval_frame, torch._C._dynamo.guards, torch._C._dynamo.utils, torch._C._fft, torch._C._linalg, torch._C._nested, torch._C._nn, torch._C._sparse, torch._C._special (total: 24)
+E0826 19:34:00.430000 1 torch/distributed/elastic/multiprocessing/api.py:880] failed (exitcode: -11) local_rank: 0 (pid: 293) of binary: /usr/bin/python
+Traceback (most recent call last):
+  File "/usr/local/bin/torchrun", line 7, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 357, in wrapper
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 936, in main
+    run(args)
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 927, in run
+    elastic_launch(
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 151, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 288, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError:
