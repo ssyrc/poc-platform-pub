@@ -118,3 +118,178 @@ Warning: Permanently added 'node19' (ED25519) to the list of known hosts.
 [PHASE] collect
 [INFO] host=node19 exit_code=0
 [PHASE] done
+
+
+
+### phg4003 에러
+[localhost] :::MLLOG {"namespace": "", "time_ms": 1787728465049, "event_type": "POINT_IN_TIME", "key": "tracked_stats", "value": {"warmup_time": 1.8663638764992356}, "metadata": {"file": "/usr/local/lib/python3.12/dist-packages/mlperf_common/callbacks/logging.py", "lineno": 163, "step": 0}}
+[localhost] :::MLLOG {"namespace": "", "time_ms": 1787728465050, "event_type": "POINT_IN_TIME", "key": "tracked_stats", "value": {"init_finished": 0.0007347064092755318}, "metadata": {"file": "/usr/local/lib/python3.12/dist-packages/mlperf_common/callbacks/logging.py", "lineno": 163, "step": 0}}
+[localhost] :::MLLOG {"namespace": "", "time_ms": 1787728465060, "event_type": "INTERVAL_END", "key": "init_stop", "value": null, "metadata": {"file": "/usr/local/lib/python3.12/dist-packages/mlperf_common/callbacks/logging.py", "lineno": 83}}
+[localhost] :::MLLOG {"namespace": "", "time_ms": 1787728465071, "event_type": "INTERVAL_START", "key": "run_start", "value": null, "metadata": {"file": "/usr/local/lib/python3.12/dist-packages/mlperf_common/callbacks/logging.py", "lineno": 83}}
+[localhost] :::MLLOG {"namespace": "", "time_ms": 1787728465086, "event_type": "INTERVAL_START", "key": "block_start", "value": null, "metadata": {"file": "/usr/local/lib/python3.12/dist-packages/mlperf_common/callbacks/logging.py", "lineno": 185, "samples_count": 1280, "step": 0}}
+[localhost] ERROR: Unexpected bus error encountered in worker. This might be caused by insufficient shared memory (shm).
+[localhost] ERROR: Unexpected bus error encountered in worker. This might be caused by insufficient shared memory (shm).
+[localhost] ERROR: Unexpected bus error encountered in worker. This might be caused by insufficient shared memory (shm).
+[localhost] ERROR: Unexpected bus error encountered in worker. This might be caused by insufficient shared memory (shm).
+[localhost] ERROR: Unexpected bus error encountered in worker. This might be caused by insufficient shared memory (shm).
+[localhost] ERROR: Unexpected bus error encountered in worker. This might be caused by insufficient shared memory (shm).
+[localhost] Error executing job with overrides: ['++ckpt_root=/home/gpu1/yr9.choi/01_BMT/poc-platform/data/training_llama2_70b_lora/model', '++data_root=/home/gpu1/yr9.choi/01_BMT/poc-platform/data/training_llama2_70b_lora/data', '++trainer.devices=8', '++trainer.num_nodes=1', '++trainer.max_steps=10', '++trainer.limit_val_batches=1', '++trainer.val_check_interval=10', '++trainer.log_every_n_steps=1', '++trainer.enable_progress_bar=true', '++trainer.precision=bf16-mixed', '++model.tensor_model_parallel_size=8', '++model.pipeline_model_parallel_size=1', '++model.context_parallel_size=1', '++model.micro_batch_size=1', '++model.global_batch_size=128', '++model.encoder_seq_length=8192']
+[localhost] [rank2]: Traceback (most recent call last):
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/utils/data/dataloader.py", line 1271, in _try_get_data
+[localhost] [rank2]:     data = self._data_queue.get(timeout=timeout)
+[localhost] [rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/lib/python3.12/queue.py", line 180, in get
+[localhost] [rank2]:     self.not_empty.wait(remaining)
+[localhost] [rank2]:   File "/usr/lib/python3.12/threading.py", line 359, in wait
+[localhost] [rank2]:     gotit = waiter.acquire(True, timeout)
+[localhost] [rank2]:             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/utils/data/_utils/signal_handling.py", line 73, in handler
+[localhost] [rank2]:     _error_if_any_worker_fails()
+[localhost] [rank2]: RuntimeError: DataLoader worker (pid 733) is killed by signal: Bus error. It is possible that dataloader's workers are out of shared memory. Please try to raise your shared memory limit.
+[localhost]
+[localhost] [rank2]: The above exception was the direct cause of the following exception:
+[localhost]
+[localhost] [rank2]: Traceback (most recent call last):
+[localhost] [rank2]:   File "/home/gpu1/yr9.choi/01_BMT/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", line 570, in <module>
+[localhost] [rank2]:     main()
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/hydra/main.py", line 94, in decorated_main
+[localhost] [rank2]:     _run_hydra(
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+[localhost] [rank2]:     _run_app(
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 457, in _run_app
+[localhost] [rank2]:     run_and_report(
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 223, in run_and_report
+[localhost] [rank2]:     raise ex
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 220, in run_and_report
+[localhost] [rank2]:     return func()
+[localhost] [rank2]:            ^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 458, in <lambda>
+[localhost] [rank2]:     lambda: hydra.run(
+[localhost] [rank2]:             ^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/hydra.py", line 132, in run
+[localhost] [rank2]:     _ = ret.return_value
+[localhost] [rank2]:         ^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/hydra/core/utils.py", line 260, in return_value
+[localhost] [rank2]:     raise self._return_value
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/hydra/core/utils.py", line 186, in run_job
+[localhost] [rank2]:     ret.return_value = task_function(task_cfg)
+[localhost] [rank2]:                        ^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/home/gpu1/yr9.choi/01_BMT/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", line 566, in main
+[localhost] [rank2]:     trainer.fit(model, data)
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 538, in fit
+[localhost] [rank2]:     call._call_and_handle_interrupt(
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/call.py", line 46, in _call_and_handle_interrupt
+[localhost] [rank2]:     return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+[localhost] [rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105, in launch
+[localhost] [rank2]:     return function(*args, **kwargs)
+[localhost] [rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 574, in _fit_impl
+[localhost] [rank2]:     self._run(model, ckpt_path=ckpt_path)
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 981, in _run
+[localhost] [rank2]:     results = self._run_stage()
+[localhost] [rank2]:               ^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 1025, in _run_stage
+[localhost] [rank2]:     self.fit_loop.run()
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/loops/fit_loop.py", line 205, in run
+[localhost] [rank2]:     self.advance()
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/loops/fit_loop.py", line 363, in advance
+[localhost] [rank2]:     self.epoch_loop.run(self._data_fetcher)
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/loops/training_epoch_loop.py", line 140, in run
+[localhost] [rank2]:     self.advance(data_fetcher)
+[localhost] [rank2]:   File "/workspace/ft-llm/NeMo/nemo/lightning/pytorch/trainer.py", line 47, in advance
+[localhost] [rank2]:     super().advance(data_fetcher)
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/loops/training_epoch_loop.py", line 250, in advance
+[localhost] [rank2]:     batch_output = self.automatic_optimization.run(trainer.optimizers[0], batch_idx, kwargs)
+[localhost] [rank2]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/loops/optimization/automatic.py", line 190, in run
+[localhost] [rank2]:     self._optimizer_step(batch_idx, closure)
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/loops/optimization/automatic.py", line 268, in _optimizer_step
+[localhost] [rank2]:     call._call_lightning_module_hook(
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/call.py", line 167, in _call_lightning_module_hook
+[localhost] [rank2]:     output = fn(*args, **kwargs)
+[localhost] [rank2]:              ^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/core/module.py", line 1306, in optimizer_step
+[localhost] [rank2]:     optimizer.step(closure=optimizer_closure)
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/core/optimizer.py", line 153, in step
+[localhost] [rank2]:     step_output = self._strategy.optimizer_step(self._optimizer, closure, **kwargs)
+[localhost] [rank2]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/workspace/ft-llm/NeMo/nemo/lightning/pytorch/strategies/megatron_strategy.py", line 844, in optimizer_step
+[localhost] [rank2]:     optimizer_output = super().optimizer_step(optimizer, closure, model, **kwargs)
+[localhost] [rank2]:                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/strategies/ddp.py", line 270, in optimizer_step
+[localhost] [rank2]:     optimizer_output = super().optimizer_step(optimizer, closure, model, **kwargs)
+[localhost] [rank2]:                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/strategies/strategy.py", line 238, in optimizer_step
+[localhost] [rank2]:     return self.precision_plugin.optimizer_step(optimizer, model=model, closure=closure, **kwargs)
+[localhost] [rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/plugins/precision/precision.py", line 122, in optimizer_step
+[localhost] [rank2]:     return optimizer.step(closure=closure, **kwargs)
+[localhost] [rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/optim/lr_scheduler.py", line 133, in wrapper
+[localhost] [rank2]:     return func.__get__(opt, opt.__class__)(*args, **kwargs)
+[localhost] [rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/workspace/ft-llm/NeMo/nemo/core/optim/mcore_optim.py", line 143, in step
+[localhost] [rank2]:     loss = closure()
+[localhost] [rank2]:            ^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/plugins/precision/precision.py", line 108, in _wrap_closure
+[localhost] [rank2]:     closure_result = closure()
+[localhost] [rank2]:                      ^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/loops/optimization/automatic.py", line 144, in __call__
+[localhost] [rank2]:     self._result = self.closure(*args, **kwargs)
+[localhost] [rank2]:                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/utils/_contextlib.py", line 120, in decorate_context
+[localhost] [rank2]:     return func(*args, **kwargs)
+[localhost] [rank2]:            ^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/loops/optimization/automatic.py", line 129, in closure
+[localhost] [rank2]:     step_output = self._step_fn()
+[localhost] [rank2]:                   ^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/loops/optimization/automatic.py", line 317, in _training_step
+[localhost] [rank2]:     training_step_output = call._call_strategy_hook(trainer, "training_step", *kwargs.values())
+[localhost] [rank2]:                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/call.py", line 319, in _call_strategy_hook
+[localhost] [rank2]:     output = fn(*args, **kwargs)
+[localhost] [rank2]:              ^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/workspace/ft-llm/NeMo/nemo/lightning/pytorch/strategies/megatron_strategy.py", line 756, in training_step
+[localhost] [rank2]:     out = self.model.training_step(dataloader_iter, *args, **kwargs)
+[localhost] [rank2]:           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/workspace/ft-llm/NeMo/nemo/lightning/megatron_parallel.py", line 354, in training_step
+[localhost] [rank2]:     return self._step(
+[localhost] [rank2]:            ^^^^^^^^^^^
+[localhost] [rank2]:   File "/workspace/ft-llm/NeMo/nemo/lightning/megatron_parallel.py", line 466, in _step
+[localhost] [rank2]:     return self.forward(
+[localhost] [rank2]:            ^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/workspace/ft-llm/NeMo/nemo/lightning/megatron_parallel.py", line 316, in forward
+[localhost] [rank2]:     microbatch_outputs = step()
+[localhost] [rank2]:                          ^^^^^^
+[localhost] [rank2]:   File "/workspace/ft-llm/NeMo/nemo/lightning/megatron_parallel.py", line 1269, in __call__
+[localhost] [rank2]:     data_iterator, seq_length = self.get_data_iterator_and_seq_length()
+[localhost] [rank2]:                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/workspace/ft-llm/NeMo/nemo/lightning/megatron_parallel.py", line 1471, in get_data_iterator_and_seq_length
+[localhost] [rank2]:     batch_data = next(self.data)
+[localhost] [rank2]:                  ^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/loops/fetchers.py", line 207, in __next__
+[localhost] [rank2]:     batch, batch_idx, dataloader_idx = super(_DataLoaderIterDataFetcher, fetcher).__next__()
+[localhost] [rank2]:                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/loops/fetchers.py", line 60, in __next__
+[localhost] [rank2]:     batch = next(self.iterator)
+[localhost] [rank2]:             ^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/utilities/combined_loader.py", line 341, in __next__
+[localhost] [rank2]:     out = next(self._iterator)
+[localhost] [rank2]:           ^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/utilities/combined_loader.py", line 78, in __next__
+[localhost] [rank2]:     out[i] = next(self.iterators[i])
+[localhost] [rank2]:              ^^^^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/utils/data/dataloader.py", line 731, in __next__
+[localhost] [rank2]:     data = self._next_data()
+[localhost] [rank2]:            ^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/utils/data/dataloader.py", line 1478, in _next_data
+[localhost] [rank2]:     idx, data = self._get_data()
+[localhost] [rank2]:                 ^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/utils/data/dataloader.py", line 1430, in _get_data
+[localhost] [rank2]:     success, data = self._try_get_data()
+[localhost] [rank2]:                     ^^^^^^^^^^^^^^^^^^^^
+[localhost] [rank2]:   File "/usr/local/lib/python3.12/dist-packages/torch/utils/data/dataloader.py", line 1284, in _try_get_data
+[localhost] [rank2]:     raise RuntimeError(
+[localhost] [rank2]: RuntimeError: DataLoader worker (pid(s) 733) exited unexpectedly
+[localhost] Error executing job with overrides: ['++ckpt_root=/home/gpu1/yr9.choi/01_BMT/poc-platform/data/training_llama2_70b_lora/model', '++data_root=/home/gpu1/yr9.choi/01_BMT/poc-platform/data/training_llama2_70b_lora/data', '++trainer.devices=8', '++trainer.num_nodes=1', '++trainer.max_steps=10', '++trainer.limit_val_batches=1', '++trainer.val_check_interval=10', '++trainer.log_every_n_steps=1', '++trainer.enable_progress_bar=true', '++trainer.precision=bf16-mixed', '++model.tensor_model_parallel_size=8', '++model.pipeline_model_parallel_size=1', '++model.context_parallel_size=1', '++model.micro_batch_size=1', '++model.global_batch_size=128', '++model.encoder_seq_length=8192']
