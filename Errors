@@ -113,6 +113,8 @@ PYTHONFAULTHANDLER=1 \
 node19 dev bond0.3061 src node20 uid 0
     cache
 
+# scripts/nccl_probe.sh 에서 NCCL_IB_HCA NCCL_SOCKET_IFNAME NCCL_SOCKET_FAMILY 로 변경
+
 ### Socket IFNAME 지정
 NCCL_NET_PLUGIN=none \
 NCCL_NET=Socket \
@@ -126,19 +128,8 @@ UCX_ERROR_SIGNALS= \
 PYTHONFAULTHANDLER=1 \
 ./scripts/nccl_probe.sh --hosts $N1,$N2 --image $IMG
 
-# 에러메시지
-[node19] node-26043:298:298 [5] NCCL INFO Connected all trees
+# 성공!
 
-[node20] node-26044:292:485 [1] NCCL INFO socketPollConnect: connect to fe80::4a13:89ff:fe6e:cc92%bond0<43731> returned Connection timed out, retrying (1/34) after sleep for 100 msec
-[node20] node-26044:293:482 [2] NCCL INFO socketPollConnect: connect to fe80::4a13:89ff:fe6e:cc92%bond0<47143> returned Connection timed out, retrying (1/34) after sleep for 100 msec
-[node20] node-26044:292:485 [1] NCCL INFO socketPollConnect: connect to fe80::4a13:89ff:fe6e:cc92%bond0<42257> returned Connection timed out, retrying (1/34) after sleep for 100 msec
-[node20] node-26044:293:482 [2] NCCL INFO socketPollConnect: connect to fe80::4a13:89ff:fe6e:cc92%bond0<45937> returned Connection timed out, retrying (1/34) after sleep for 100 msec
-[node19] node-26043:294:483 [1] NCCL INFO socketPollConnect: connect to fe80::4a13:89ff:fe6e:7286%bond0<48017> returned Connection timed out, retrying (1/34) after sleep for 100 msec
-[node19] node-26043:295:492 [2] NCCL INFO socketPollConnect: connect to fe80::4a13:89ff:fe6e:7286%bond0<59465> returned Connection timed out, retrying (1/34) after sleep for 100 msec
-[node19] node-26043:294:483 [1] NCCL INFO socketPollConnect: connect to fe80::4a13:89ff:fe6e:7286%bond0<50431> returned Connection timed out, retrying (1/34) after sleep for 100 msec
-[node19] node-26043:295:492 [2] NCCL INFO socketPollConnect: connect to fe80::4a13:89ff:fe6e:7286%bond0<40705> returned Connection timed out, retrying (1/34) after sleep for 100 msec
-[node20] [rank13]:[E826 20:41:02.728692157 ProcessGroupNCCL.cpp:685] [Rank 13] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=1, OpType=ALLREDUCE, NumelIn=1048576, NumelOut=1048576, Timeout(ms)=180000) ran for 180036 milliseconds before timing out.
-[node20] [rank13]:[E826 20:41:02.728951948 ProcessGroupNCCL.cpp:2251] [PG ID 0 PG GUID 0(default_pg) Rank 13]  failure detected by watchdog at work sequence id: 1 PG status: last enqueued work: 1, last completed work: -1
-[node20] [rank13]:[E826 20:41:02.728962527 ProcessGroupNCCL.cpp:732] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
-[node20] [rank13]:[E826 20:41:02.729006973 ProcessGroupNCCL.cpp:2583] [PG ID 0 PG GUID 0(default_pg) Rank 13] First PG on this rank to signal dumping.
-[node19] [rank5]:[E826 20:41:02.903436043 ProcessGroupNCCL.cpp:685] [Rank 5] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=1, OpType=ALLREDUCE, NumelIn=1048576, NumelOut=1048576, Timeout(ms)=180000) ran for 180073 milliseconds before timing out.
+
+# 멀티노드 NCCL 은 가능하나, IB/RDMA 경로에서 NCCL 실패함
+# Socket 방식으로 NCCL collective 16 GPU 확인
