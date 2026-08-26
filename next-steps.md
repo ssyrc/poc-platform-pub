@@ -82,9 +82,12 @@ TP=1이면 `++model.sequence_parallel=False`를 자동으로 붙입니다.
 
 ## 준비
 
+`git pull`은 **제가 코드를 고쳤다고 적은 라운드에만** 하시면 됩니다.
+필요한 STEP에는 커밋 번호와 함께 표시해 두겠습니다. 표시가 없으면 안 하셔도 됩니다.
+
+
 ```bash
 cd /mgmt/server/poc-platform/poc-platform-pub
-git pull
 
 NODE=node25
 TAR=/mgmt/server/poc-platform/data/dockerimgs/llama31_8b_pyt-blackwell.tar
@@ -94,6 +97,8 @@ IMG=registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:l
 ---
 
 ## STEP 1 — NVSwitch fabric 확인 (30초, 지금 제일 중요)
+
+`git pull` 불필요 — ssh만 씁니다.
 
 **NVSwitch 노드에서 fabricmanager가 안 떠 있으면 GPU 간 P2P가 깨진 채로 초기화가
 진행되다 죽습니다. 증상이 정확히 지금 자리입니다.**
@@ -114,7 +119,10 @@ ssh $NODE 'dmesg | grep -iE "xid|nvrm|nvswitch|imex" | tail -30'
 
 ---
 
-## STEP 2 — 1-GPU 다시 (수정된 코드로)
+## STEP 2 — 1-GPU 다시
+
+**`git pull` 필요** (`19cad5e` — TP=1 sequence parallelism 자동 해제).
+이거 없이 돌리면 지난번과 똑같은 `ValueError`가 납니다.
 
 이제 sequence parallelism 때문에 죽지 않습니다. **NCCL도 NVLink도 P2P도 안 씁니다.**
 
@@ -136,7 +144,9 @@ TORCH_SHOW_CPP_STACKTRACES=1 MLPERF_TRAIN_IMAGE_TAR=$TAR \
 
 ## STEP 3 — NCCL 경로 하나씩 끄기 (STEP 2가 통과했을 때)
 
-지난 커밋에서 forward되게 만든 변수들입니다.
+**`git pull` 필요** (`cd1e79e` — `NCCL_*` 변수 forward).
+이거 없이 걸면 변수가 컨테이너까지 못 가서 아무 효과가 없습니다.
+STEP 2를 위해 이미 pull 하셨다면 그대로 됩니다.
 
 ```bash
 # (a) P2P(NVLink 직결) 끄고 8장
@@ -160,6 +170,8 @@ NVLS는 NVSwitch multicast를 쓰는데, fabric이 반쯤 올라온 상태면 �
 ---
 
 ## STEP 4 — TE의 arch 타겟 (우선순위 낮음)
+
+`git pull` 불필요 — ssh만 씁니다.
 
 위에서 적었듯 `sm_100` cubin은 B300에서 정상 동작합니다.
 남은 건 TransformerEngine의 `a` 접미사 타겟뿐이고, 크래시는 TE가 돌기 전에 납니다.
