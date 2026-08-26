@@ -49,8 +49,23 @@ need_file() { if [[ -s "$1" ]]; then ok "$2"; else bad "$2"; note "$1"; fi; }
 
 # An image is satisfied either by being loaded already or by having its offline
 # tar staged; the launchers try the tar before falling back to docker pull.
+# Mirrors the launchers' fallback so this check agrees with what a run does.
+resolve_tar() {
+  local t="$1" base d
+  [[ -n "$t" ]] || return 0
+  if [[ -s "$t" ]]; then printf '%s' "$t"; return 0; fi
+  base="$(basename "$t")"
+  IFS=':' read -ra dirs <<< "${POC_PLATFORM_DOCKERIMG_DIRS:-}"
+  for d in "${dirs[@]}"; do
+    [[ -n "$d" ]] || continue
+    if [[ -s "${d}/${base}" ]]; then printf '%s' "${d}/${base}"; return 0; fi
+  done
+  printf '%s' "$t"
+}
+
 check_image() {
-  local image="$1" tar_file="$2" label="$3"
+  local image="$1" label="$3" tar_file
+  tar_file="$(resolve_tar "$2")"
   if docker image inspect "$image" >/dev/null 2>&1; then
     ok "$label — image present locally"
   elif [[ -s "$tar_file" ]]; then

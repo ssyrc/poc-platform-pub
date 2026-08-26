@@ -102,6 +102,7 @@ if ! is_local_host "$HOST"; then echo "[INFO] checking SSH reachability: ${HOST}
 build_env_exports() {
   local env_name q out=""
   for env_name in \
+    POC_PLATFORM_DOCKERIMG_DIRS \
     MLPERF_SOURCE_EXTERNAL_CONFIG \
     MLPERF_RUN_CMD \
     MLPERF_RUN_ARGS_EXTRA \
@@ -216,6 +217,23 @@ ensure_image(){
   fi
   echo "[WARN] Docker image missing: $image"
   echo "[INFO] trying fallback tar before docker pull: ${tar_file:-<none>}"
+  # Fall back to extra tar directories when the primary path is absent — the
+  # staging area is not always under this host's DATA_ROOT (a shared mgmt
+  # server, a different mount on a test host). POC_PLATFORM_DOCKERIMG_DIRS is
+  # a colon-separated list searched by basename, set in .env.
+  if [[ -n "$tar_file" && ! -f "$tar_file" && -n "${POC_PLATFORM_DOCKERIMG_DIRS:-}" ]]; then
+    _tar_base="$(basename "$tar_file")"
+    IFS=':' read -ra _tar_dirs <<< "$POC_PLATFORM_DOCKERIMG_DIRS"
+    for _tar_dir in "${_tar_dirs[@]}"; do
+      [[ -n "$_tar_dir" ]] || continue
+      if [[ -f "${_tar_dir}/${_tar_base}" ]]; then
+        echo "[INFO] tar not at primary path; using ${_tar_dir}/${_tar_base}"
+        tar_file="${_tar_dir}/${_tar_base}"
+        break
+      fi
+    done
+  fi
+
   if [[ -n "$tar_file" && -f "$tar_file" ]]; then
     if out="$(docker load -i "$tar_file" 2>&1)"; then
       echo "$out"
