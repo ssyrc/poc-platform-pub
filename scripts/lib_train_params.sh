@@ -131,7 +131,9 @@ train_params_help() {
     --max-steps <N>          training steps
     --val-check-interval <N>
     --limit-val-batches <N>
-    --precision <p>          BF16-mixed | FP16-mixed | BF16 | FP16 | FP8 ...
+    --precision <p>          BF16 | BF16-mixed | FP16 | FP8 | FP8_HYBRID
+                             llama31_8b accepts bf16 only; anything BF16-like
+                             is mapped to it, FP8 goes through model.fp8
     --lr <f>                 learning rate            (v5.1)
     --warmup-steps <N>                                (v5.1)
     --target-log-ppl <f>                              (v5.1)

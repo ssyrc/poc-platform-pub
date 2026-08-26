@@ -3,90 +3,108 @@
 `Errors`에 올라온 최신 증상에 대해 **지금 실행할 커맨드**만 모아둔 파일입니다.
 `Errors`가 갱신되면 이 파일도 갱신됩니다.
 
-- 갱신: 2026-08-27 (5회차)
-- 이번 목표: Blackwell 빌드 이미지로 `llama31_8b` 테스트
+- 갱신: 2026-08-26 (6회차)
+- 이번 결론: **SIGSEGV는 사라졌습니다.** 남은 건 정밀도 값 하나였고, 코드에서 고쳤습니다.
 
 ---
 
-## 확정된 사실
+## 1. 무엇이 바뀌었나
 
-**B300 = compute capability 10.3 = `sm_103`** (`nvidia-smi --query-gpu=compute_cap`로 확인)
-
-현재 쓰던 `-sm90` 이미지의 arch list에는 `sm_103`이 없습니다.
+이번 로그에는 SIGSEGV도, `rank 6`도, UCX 백트레이스도 없습니다.
+대신 깨끗한 Python 예외 하나로 끝났습니다.
 
 ```
-['sm_75', 'sm_80', 'sm_86', 'sm_90', 'sm_100', 'sm_120', 'compute_120']
+AssertionError: Unsupported precision bf16-mixed
+  pretrain.py line 291, in get_model_with_precision
 ```
 
-`sm_100`은 있지만 일반 cubin의 minor 상위 호환이 통하는지와 별개로,
-TransformerEngine이 쓰는 `sm_100a` 같은 **architecture-specific 타겟은 상위 호환이 없습니다.**
-`103a`가 빠져 있으면 B300에서 TE 커널이 없습니다.
+즉 **모델이 만들어지기 전에** 설정 검증에서 멈춘 것이고, 아키텍처·드라이버·IB·UCX와는
+무관한 실패입니다.
 
-→ `llama31_8b-pyt-blackwell` tar를 `dockerimgs`에 배치 완료. 이걸로 테스트합니다.
+**단, 이번 실행은 변수가 두 개 동시에 바뀌었습니다.**
 
----
+| | 이전 (SIGSEGV) | 이번 |
+|---|---|---|
+| 이미지 | `-sm90` | `llama31_8b_pyt-blackwell` |
+| 노드 | `...19` | `...25` |
+| 벤치마크 | `llama2_70b_lora` | `llama31_8b` |
 
-## 새로 가능해진 것 (커밋 `76a7fc8`)
-
-`--docker-image`로 이미지를 바꿔도 **tar 경로는 기본 이미지 것 그대로**였습니다.
-폐쇄망에서는 엉뚱한 tar를 로드하고 → 요청한 태그는 여전히 없고 → `docker pull`로 넘어가 실패합니다.
-
-`MLPERF_TRAIN_IMAGE_TAR`로 짝이 맞는 tar를 지정할 수 있게 했습니다.
-(inference의 `MLPERF_INFER_IMAGE_TAR`와 같은 방식)
+그래서 "blackwell 이미지가 SIGSEGV를 고쳤다"는 **아직 확정이 아닙니다.**
+정밀도 문제를 넘긴 뒤 실제로 스텝이 도는 걸 봐야 확정됩니다. (아래 STEP 2)
 
 ---
 
-## 준비
+## 2. 원인 — 확정 (업스트림 소스 확인)
+
+`mlcommons/training_results_v5.1`의 `llama31_8b/implementations/nemo/pretrain.py`,
+`get_model_with_precision` 끝부분입니다.
+
+```python
+if config.model.fp8 or config.model.fp4:      # FP8/FP4가 우선
+    precision = MegatronMixedPrecision(precision="bf16-mixed", ...)
+elif config.trainer.precision == "bf16":
+    precision = MegatronMixedPrecision(precision="bf16-mixed", ...)
+else:
+    assert False, f"Unsupported precision {config.trainer.precision}"
+```
+
+**`trainer.precision`으로 받아주는 값은 `bf16` 하나뿐입니다.**
+`bf16-mixed`는 내부에서 쓰는 값이지, 밖에서 넣는 값이 아닙니다.
+
+같은 파일 `get_optimizer`도 동일합니다.
+
+```python
+bf16 = config.trainer.precision == "bf16"
+```
+
+`bf16-mixed`를 넣으면 여기서도 False가 되어 옵티마이저 경로까지 어긋납니다.
+
+### 왜 llama2_70b_lora는 멀쩡했나
+
+`llama2_70b_lora/implementations/nemo/train.py`는 이 키를 **읽지 않습니다.**
+자기가 직접 `nl.MegatronMixedPrecision(precision="bf16-mixed")`로 박아 씁니다.
+그래서 같은 `bf16-mixed`를 넘겨도 무해했고, 이번에 8b로 옮기면서 처음 드러난 것입니다.
+
+### FP8은 이 키로 켜는 게 아닙니다
+
+8b에서 FP8/FP4는 `model.fp8`로 분기하고 `trainer.precision`은 `bf16`으로 둡니다.
+기존 스크립트는 FP8일 때 `transformer-engine`을 넣고 있었는데, 이것도 같은 이유로
+틀린 값이었습니다. 함께 고쳤습니다.
+
+---
+
+## 3. 적용한 수정
+
+`scripts/mlperf_train_v51.sh`의 **llama31_8b 분기에 한해** 정밀도 매핑을 바꿨습니다.
+(`llama2_70b_lora` 분기와 `mlperf_train_v41.sh`는 손대지 않았습니다. v4.1에는 8b가 없습니다.)
+
+| 입력 | 이전 → 결과 | 지금 → 결과 |
+|---|---|---|
+| (미지정) | `bf16-mixed` → **abort** | `bf16` → 정상 |
+| `BF16-mixed` / `bf16-mixed` | `bf16-mixed` → **abort** | `bf16` → 정상 |
+| `BF16` | `bf16` → 정상 | `bf16` → 정상 |
+| `FP8` | `transformer-engine` → **abort** | `bf16` + `model.fp8=True` |
+| `FP8_HYBRID` | `transformer-engine` → **abort** | `bf16` + `model.fp8_hybrid=True` |
+| 그 외 (FP16/FP32 등) | 제각각 | 경고 후 `bf16` |
+
+---
+
+## 4. 준비
 
 ```bash
 cd /mgmt/server/poc-platform/poc-platform-pub
 git pull
 
-NODE=<대상 노드 IP>
+NODE=node25
 TAR=/mgmt/server/poc-platform/data/dockerimgs/llama31_8b_pyt-blackwell.tar
+IMG=<STEP 1에서 확인한 REPOSITORY:TAG>
 ```
 
 ---
 
-## STEP 1 — tar 로드하고 실제 태그 확인
+## STEP 1 — 다시 실행 (수정된 코드로)
 
-tar 안의 태그가 예상과 다를 수 있으므로 **출력된 이름을 그대로** 다음 단계에 씁니다.
-
-```bash
-ssh $NODE "docker load -i $TAR"
-ssh $NODE 'docker images | grep -i llama31_8b'
-```
-
-확인된 태그를 변수에 넣습니다.
-
-```bash
-IMG=<위에서 확인한 REPOSITORY:TAG>
-```
-
----
-
-## STEP 2 — 이 이미지가 `sm_103`을 담고 있는지 확인
-
-이번 시도의 전제입니다. 한 줄로 끝납니다.
-
-```bash
-ssh $NODE "docker run --rm --gpus all $IMG \
-  python -c 'import torch; print(torch.cuda.get_arch_list())'"
-```
-
-TransformerEngine 쪽도 함께 봅니다. **여기에 `sm_103` 또는 `sm_103a`가 있어야** B300에서
-FP8 커널이 돕니다.
-
-```bash
-ssh $NODE "docker run --rm --gpus all $IMG bash -c '
-so=\$(find / -name \"*.so\" -path \"*transformer_engine*\" 2>/dev/null | head -1)
-echo \"== \$so\"
-cuobjdump --list-elf \"\$so\" 2>/dev/null | grep -oE \"sm_[0-9]+[a-z]*\" | sort -u | tr \"\\n\" \" \"'"
-```
-
----
-
-## STEP 3 — `llama31_8b` 실행
+정밀도 관련 플래그는 **주지 마세요.** 기본값이 이제 `bf16`입니다.
 
 ```bash
 UCX_HANDLE_ERRORS=none \
@@ -99,60 +117,62 @@ MLPERF_TRAIN_IMAGE_TAR=$TAR \
   --tp 8 --pp 1 --mbs 1 --gbs 128 --max-steps 10
 ```
 
-**전달 확인용으로 로그에서 볼 것**
+**로그에서 확인할 것**
 
-- `[INFO] fallback_tar=...llama31_8b_pyt-blackwell.tar` — tar override가 걸렸는지
-- `[INFO] docker_image=...` — 의도한 태그인지
-- `[INFO] advanced env forwarded:` 에 `UCX_HANDLE_ERRORS`, `PYTHONFAULTHANDLER`
-
-데이터가 없다면 먼저 확인하세요.
-
-```bash
-./scripts/preflight.sh training v5.1
+```
+++trainer.precision=bf16        <- -mixed 가 붙어 있으면 pull이 안 된 것입니다
 ```
 
-`llama31_8b` 데이터셋은 `${MLPERF_DATA_ROOT}/training_llama31_8b/8b` 입니다.
+`[CONTAINER] FP8=False FP8_HYBRID=False TRAINER_PRECISION=bf16` 줄도 같이 보입니다.
 
 ---
 
-## STEP 4 — GPU 6 격리 (병행 권장, 2~3분)
+## STEP 2 — 결과에 따라
 
-**두 번 다 `rank 6`에서만 죽었습니다.** 나머지 랭크는 torchrun이 SIGTERM으로 정리한 것뿐입니다.
-아키텍처 문제라면 모든 랭크가 같이 죽어야 하므로, 이 패턴은 특정 GPU를 가리킵니다.
+| 결과 | 의미 | 다음 |
+|---|---|---|
+| 스텝이 돈다 | **B300 + blackwell 이미지 확정.** SIGSEGV는 `-sm90`의 `sm_103` 부재였음 | 런처 기본 이미지를 blackwell로 되돌리겠습니다 |
+| 또 SIGSEGV | 이미지 문제가 아니었음 | STEP 3(노드/GPU 격리)으로 갑니다 |
+| 다른 Python 예외 | 설정이 하나 더 남은 것 | 그 traceback을 `Errors`에 주세요. 위처럼 소스에서 확정하겠습니다 |
 
-STEP 3과 독립이므로 언제 돌려도 됩니다. **현재 구성 그대로 GPU 0~3만** 사용합니다.
+---
 
-```bash
-UCX_HANDLE_ERRORS=none PYTHONFAULTHANDLER=1 \
-./scripts/run_single_node.sh --host $NODE --gpus 4 --tp 4 --pp 1 --mbs 1 --gbs 64 --max-steps 10
-```
+## STEP 3 — SIGSEGV가 재현될 때만
 
-| 결과 | 의미 |
-|---|---|
-| 통과 | GPU 4~7 쪽 문제. 이미지를 바꿔도 8장 쓰면 재발합니다 |
-| 다른 랭크에서 죽음 | 특정 GPU 아님. 아키텍처 가설이 유력해집니다 |
-
-하드웨어 증거도 같이 봅니다. **Xid가 보이면 하드웨어로 확정**입니다.
+이전 SIGSEGV는 **두 번 다 `rank 6`에서만** 났고, 그건 아직 설명되지 않은 채입니다.
+이번에 재현되면 그때 돌리세요. 안 나면 건너뛰어도 됩니다.
 
 ```bash
+# GPU 0~3만
+UCX_HANDLE_ERRORS=none PYTHONFAULTHANDLER=1 MLPERF_TRAIN_IMAGE_TAR=$TAR \
+./scripts/run_single_node.sh --host $NODE --benchmark llama31_8b --docker-image $IMG \
+  --gpus 4 --tp 4 --pp 1 --mbs 1 --gbs 64 --max-steps 10
+
+# 하드웨어 증거 (Xid가 보이면 하드웨어 확정)
 ssh $NODE 'nvidia-smi -i 6 -q | grep -iE "ecc|retired|remapp|pending"'
 ssh $NODE 'dmesg | grep -iE "xid|nvrm" | tail -20'
 ```
 
+**참고:** 이전 SIGSEGV는 `...19`, 이번 실행은 `...25`입니다. 같은 노드에서 비교해야
+의미가 있습니다.
+
 ---
 
-## STEP 5 — 결과 회신
+## STEP 4 — 회신
 
 `Errors`에 붙여주세요.
 
-1. STEP 1의 `docker images` 출력 (실제 태그)
-2. STEP 2의 `get_arch_list()`와 TE의 `sm_*` 목록
-3. STEP 3 결과 — 통과했는지, 죽었다면 **어느 rank**인지와 Python traceback
-4. STEP 4를 했다면 그 결과
+1. `++trainer.precision=` 이 실제로 무엇으로 찍혔는지
+2. 통과했다면 몇 스텝까지 돌았는지 / 실패했다면 rank와 traceback
+3. STEP 1의 `docker images` 태그 (아직 안 주셨습니다)
+4. 이미지의 `torch.cuda.get_arch_list()` 결과 — `sm_103` 유무
 
-STEP 3이 통과하면 **B300은 blackwell 태그를 써야 한다**가 확정되고,
-런처 기본값을 그렇게 되돌리겠습니다. (문서 근거로 `-sm90`으로 되돌린 이력이 있는데,
-실측이 문서를 이깁니다.)
+3, 4번은 blackwell 이미지 가설을 문서로 굳히는 데 필요합니다.
+
+```bash
+ssh $NODE 'docker images | grep -i llama31_8b'
+ssh $NODE "docker run --rm --gpus all $IMG python -c 'import torch; print(torch.cuda.get_arch_list())'"
+```
 
 ---
 
@@ -160,15 +180,16 @@ STEP 3이 통과하면 **B300은 blackwell 태그를 써야 한다**가 확정�
 
 | 항목 | 결과 |
 |---|---|
+| llama31_8b 정밀도 | **`bf16`만 허용** (업스트림 `pretrain.py:291`에서 확정) |
+| llama2_70b_lora 정밀도 | `trainer.precision`을 안 읽음. `bf16-mixed`여도 무해 |
 | GPU compute capability | **10.3 (sm_103)** |
 | 호스트 IB | NIC 전부 ACTIVE / link up |
 | `nvidia_peermem` | 로드됨 (컨테이너 배너의 "not detected"는 오탐) |
 | 컨테이너 UCX | `mlx5_0`~`mlx5_15`, `cuda_cpy`, `cuda_ipc` 전부 정상 인식 |
 | UCX transport | 원인 아님. 4프레임 백트레이스는 UCX의 전역 시그널 핸들러였음 |
-| 크래시 실체 | `local_rank 6` 프로세스의 SIGSEGV (`exitcode -11`), 2회 모두 동일 |
 | 런처 코드 | `mlperf_run.sh` / `common.sh` 원본과 동일 |
 | 컨테이너 인자 | `--ipc=host`, `--ulimit memlock=-1`, `--network=host`, IB 패스스루 모두 정상 |
-| 기존 이미지 | CUDA 13.0, PyTorch 2.9.0a0 (NGC 25.09), arch list에 `sm_103` 없음 |
+| `-sm90` 이미지 | CUDA 13.0, PyTorch 2.9.0a0 (NGC 25.09), arch list에 `sm_103` 없음 |
 
 ---
 

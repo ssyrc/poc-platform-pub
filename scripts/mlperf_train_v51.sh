@@ -937,30 +937,40 @@ export WARMUP_STEPS="${WARMUP_STEPS:-2}"
 export TARGET_LOG_PPL="${TARGET_LOG_PPL:-3.3}"
 export FP8="${FP8:-${FP8_HYBRID:-False}}"
 export FP8_HYBRID="${FP8_HYBRID:-$FP8}"
-export TRAINER_PRECISION="${TRAINER_PRECISION:-${MLPERF_TRAINER_PRECISION:-bf16-mixed}}"
+# llama31_8b is stricter than llama2_70b_lora here. Its pretrain.py
+# (get_model_with_precision) accepts exactly one value:
+#
+#   elif config.trainer.precision == "bf16": ...
+#   else: assert False, f"Unsupported precision {config.trainer.precision}"
+#
+# so "bf16-mixed" -- fine for llama2_70b_lora, which hardcodes its own
+# MegatronMixedPrecision(precision="bf16-mixed") and never reads this key --
+# aborts the 8b run before the first step. get_optimizer tests
+# `config.trainer.precision == "bf16"` too, so the plain value is also what
+# selects the bf16 optimizer path.
+#
+# FP8/FP4 do not go through this key: pretrain.py branches on config.model.fp8
+# (passed below as ++model.fp8) and keeps trainer.precision at bf16.
+export TRAINER_PRECISION="${TRAINER_PRECISION:-${MLPERF_TRAINER_PRECISION:-bf16}}"
 case "${TRAINER_PRECISION}" in
-  FP32|32|32-true|FP64|64|64-true)
-    echo "[CONTAINER][WARN] TRAINER_PRECISION=${TRAINER_PRECISION} is not supported by this NeMo/Megatron MLPerf training path; using bf16-mixed" >&2
-    TRAINER_PRECISION="bf16-mixed"
+  bf16)
     ;;
-  FP16|16|16-true|fp16-mixed)
-    TRAINER_PRECISION="16-mixed"
-    ;;
-  BF16|bf16-true)
+  BF16|bf16-true|BF16-true|bf16-mixed|BF16-mixed|bf16_mixed)
     TRAINER_PRECISION="bf16"
     ;;
-  BF16-mixed)
-    TRAINER_PRECISION="bf16-mixed"
-    ;;
   FP8)
-    TRAINER_PRECISION="transformer-engine"
+    TRAINER_PRECISION="bf16"
     FP8="True"
     FP8_HYBRID="False"
     ;;
   FP8_HYBRID)
-    TRAINER_PRECISION="transformer-engine"
+    TRAINER_PRECISION="bf16"
     FP8="True"
     FP8_HYBRID="True"
+    ;;
+  *)
+    echo "[CONTAINER][WARN] TRAINER_PRECISION=${TRAINER_PRECISION} is not accepted by llama31_8b pretrain.py (bf16 only); using bf16" >&2
+    TRAINER_PRECISION="bf16"
     ;;
 esac
 export TRAINER_PRECISION MLPERF_TRAINER_PRECISION="${TRAINER_PRECISION}" FP8 FP8_HYBRID
@@ -980,30 +990,40 @@ export MLPERF_LIMIT_VAL_BATCHES="${MLPERF_LIMIT_VAL_BATCHES:-1}"
 export MLPERF_VAL_CHECK_INTERVAL="${MLPERF_VAL_CHECK_INTERVAL:-10}"
 export MLPERF_LOG_EVERY_N_STEPS="${MLPERF_LOG_EVERY_N_STEPS:-1}"
 export MLPERF_ENABLE_PROGRESS_BAR="${MLPERF_ENABLE_PROGRESS_BAR:-true}"
-export TRAINER_PRECISION="${TRAINER_PRECISION:-${MLPERF_TRAINER_PRECISION:-bf16-mixed}}"
+# llama31_8b is stricter than llama2_70b_lora here. Its pretrain.py
+# (get_model_with_precision) accepts exactly one value:
+#
+#   elif config.trainer.precision == "bf16": ...
+#   else: assert False, f"Unsupported precision {config.trainer.precision}"
+#
+# so "bf16-mixed" -- fine for llama2_70b_lora, which hardcodes its own
+# MegatronMixedPrecision(precision="bf16-mixed") and never reads this key --
+# aborts the 8b run before the first step. get_optimizer tests
+# `config.trainer.precision == "bf16"` too, so the plain value is also what
+# selects the bf16 optimizer path.
+#
+# FP8/FP4 do not go through this key: pretrain.py branches on config.model.fp8
+# (passed below as ++model.fp8) and keeps trainer.precision at bf16.
+export TRAINER_PRECISION="${TRAINER_PRECISION:-${MLPERF_TRAINER_PRECISION:-bf16}}"
 case "${TRAINER_PRECISION}" in
-  FP32|32|32-true|FP64|64|64-true)
-    echo "[CONTAINER][WARN] TRAINER_PRECISION=${TRAINER_PRECISION} is not supported by this NeMo/Megatron MLPerf training path; using bf16-mixed" >&2
-    TRAINER_PRECISION="bf16-mixed"
+  bf16)
     ;;
-  FP16|16|16-true|fp16-mixed)
-    TRAINER_PRECISION="16-mixed"
-    ;;
-  BF16|bf16-true)
+  BF16|bf16-true|BF16-true|bf16-mixed|BF16-mixed|bf16_mixed)
     TRAINER_PRECISION="bf16"
     ;;
-  BF16-mixed)
-    TRAINER_PRECISION="bf16-mixed"
-    ;;
   FP8)
-    TRAINER_PRECISION="transformer-engine"
+    TRAINER_PRECISION="bf16"
     FP8="True"
     FP8_HYBRID="False"
     ;;
   FP8_HYBRID)
-    TRAINER_PRECISION="transformer-engine"
+    TRAINER_PRECISION="bf16"
     FP8="True"
     FP8_HYBRID="True"
+    ;;
+  *)
+    echo "[CONTAINER][WARN] TRAINER_PRECISION=${TRAINER_PRECISION} is not accepted by llama31_8b pretrain.py (bf16 only); using bf16" >&2
+    TRAINER_PRECISION="bf16"
     ;;
 esac
 export TRAINER_PRECISION MLPERF_TRAINER_PRECISION="${TRAINER_PRECISION}" FP8 FP8_HYBRID
