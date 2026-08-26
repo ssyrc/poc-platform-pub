@@ -3,76 +3,81 @@
 `Errors`에 올라온 최신 증상에 대해 **지금 실행할 커맨드**만 모아둔 파일입니다.
 `Errors`가 갱신되면 이 파일도 갱신됩니다.
 
-- 갱신: 2026-08-26 (10회차)
-- 이번 결론: **GPU 1장에서도 죽습니다.** 통신 토폴로지 가설은 전부 무너졌습니다.
+- 갱신: 2026-08-26 (11회차)
+- 이번 용의자: **HPC-X의 외부 NCCL 플러그인** (`libnccl-net.so`)
 
 ---
 
-## 1. 마침내 진짜 스택이 나왔습니다
+## 1. 프로브가 크래시 지점을 찍었습니다
 
-`PYTHONFAULTHANDLER=1` + `UCX_HANDLE_ERRORS=none`이 이번엔 제대로 들어갔습니다.
-UCX 4프레임 대신 이게 나왔습니다.
+30초 만에 재현됐고, NCCL이 죽기 직전 마지막 줄까지 남았습니다.
 
 ```
+NCCL INFO NET/Plugin: Loaded net plugin NCCL RDMA Plugin v10 (v10)
+NCCL INFO NET/Plugin: Loaded collnet plugin SHARP (v10)
+NCCL INFO Successfully loaded external network plugin /opt/hpcx/nccl_rdma_sharp_plugin/lib/libnccl-net.so
+NCCL INFO P2P plugin v10 IBext_v10
+NCCL INFO Using network NCCL RDMA Plugin v10
+NCCL INFO ncclCommInitRankConfig ... rank 0 nranks 1 ... Init START
+NCCL INFO MNNVL busId 0x1a000 fabric UUID 0.0 cliqueId 0x0 state 3 healthMask 0x80
 Fatal Python error: Segmentation fault
-
-  distributed_c10d.py:2826  in broadcast
-  distributed_c10d.py:3630  in broadcast_object_list
-  lightning/.../ddp.py:307  in broadcast
-  trainer.py:1233           in log_dir
-  trainer.py:1071           in __setup_profiler
 ```
 
-`trainer.log_dir`이 rank 간에 경로를 맞추려고 `broadcast_object_list`를 부르고,
-그게 NCCL `broadcast`로 내려가면서 죽습니다.
-
-**이게 이 프로세스의 첫 NCCL collective입니다.** 바로 위 줄에 `NCCL version 2.28.3+cuda13.0`이
-찍혀 있는데, NCCL은 communicator를 처음 만들 때 이 배너를 냅니다.
-즉 **`ncclCommInitRank` 안에서 죽는 것**이 확정됐습니다.
+`Init START`는 있는데 **`Init COMPLETE`가 없습니다.** `ncclCommInitRankConfig` 한가운데서
+죽는 게 로그로 확정됐습니다.
 
 ---
 
-## 2. 그리고 이건 1-GPU 실행입니다
+## 2. 죽은 가설 정리
 
-```
-All distributed processes registered. Starting with 1 processes
-...
-failed (exitcode: -11) local_rank: 0
-```
-
-**랭크가 하나입니다.** NVLink도, P2P도, NVSwitch도, 랭크 간 통신 자체가 없습니다.
-
-지난 라운드에 제가 세운 것들이 여기서 무너집니다.
-
-| 가설 | 상태 |
+| 가설 | 근거 |
 |---|---|
-| 8-GPU 통신 계층 (NVLink/NVSwitch/P2P) | **폐기.** 1랭크에는 존재하지 않습니다 |
-| `rank 6` 특정 GPU | **폐기.** 여기선 rank 0 |
-| NVSwitch fabric | **폐기.** fabric도 정상이었고 1랭크는 안 씁니다 |
-| MNNVL / IMEX | **약화.** 아래 참고 |
+| 드라이버 | **정상.** 580.173.02 = r580, CUDA 13.0 지원. `cudaDriverVersion 13000` |
+| MNNVL / IMEX | **폐기.** `cliqueId 0x0`, `fabric UUID 0.0` — MNNVL 소속 아님. `NCCL_MNNVL_ENABLE=0`도 무효 |
+| 8-GPU 토폴로지 | **폐기.** 1랭크에서 재현 |
+| NVSwitch fabric | **폐기.** State Completed / Success |
+| `sm_103` | **폐기.** 프로브가 `cuda:0 NVIDIA B300 SXM6 AC sm_103`까지 정상 인식 |
+| NeMo / Megatron / TE | **폐기.** 프로브엔 이것들이 아예 없습니다 |
 
-MNNVL만 완전히는 안 죽었습니다. NCCL은 communicator를 만들 때 world size와 무관하게
-MNNVL 가용성을 **탐지**하는데, 그 탐지가 fabric 핸들 할당을 실제로 시도합니다.
-1랭크여도 이 코드는 지나갑니다. 다만 "8장이라서" 라는 설명은 완전히 틀렸습니다.
-
-**남은 그림은 훨씬 단순합니다: 이 노드에서 NCCL 2.28.3이 communicator를 못 만든다.**
-NeMo도 Megatron도 TransformerEngine도 llama31_8b도 이제 용의선상에서 빠집니다.
+`NCCL_MNNVL_ENABLE=0` / `NCCL_CUMEM_ENABLE=0` / `NCCL_NVLS_ENABLE=0` / `NCCL_IB_DISABLE=1`
+**네 개가 전부 실패**한 게 오히려 답에 가깝습니다. 이 변수들은 전부 **NCCL 내부** 경로를
+끄는 것들이고, 하나도 안 통한다는 건 문제가 NCCL 내부가 아니라는 뜻입니다.
 
 ---
 
-## 3. 좋은 소식 — 이제 30초면 재현됩니다
+## 3. 남은 것 — 외부 플러그인
 
-1랭크로 재현된다는 건, 5분짜리 학습을 돌릴 이유가 없어졌다는 뜻입니다.
-지난 커밋에 넣어둔 프로브가 정확히 이 일을 합니다. `init_process_group` + all-reduce 한 번,
-그 외엔 아무것도 안 합니다.
+로그가 가리키는 건 NCCL 본체가 아니라 **HPC-X가 끼워 넣은 외부 플러그인**입니다.
 
-바꿔 말하면 **한 번에 한 변수씩, 30초마다 판정**할 수 있게 됐습니다.
+```
+/opt/hpcx/nccl_rdma_sharp_plugin/lib/libnccl-net.so   (v10)
+```
+
+이게 유력한 이유:
+
+1. **외부 바이너리입니다.** NCCL 2.28.3과 따로 빌드됐고, 플러그인 ABI가 안 맞으면
+   NCCL이 NULL 함수 포인터를 그대로 호출합니다 → 정확히 `address (nil)` 널 역참조.
+2. **랭크 수와 무관하게 로드됩니다.** 1랭크에서 재현되는 게 설명됩니다.
+3. **위 네 변수 중 어느 것도 이 플러그인을 안 내립니다.** 전부 실패한 게 설명됩니다.
+4. `NCCL_IB_DISABLE=1`도 소용없습니다 — 그건 NCCL 내장 IB 전송을 끄는 것이지
+   외부 net 플러그인을 언로드하지 않습니다.
+
+### 곁들여 눈에 띈 것
+
+```
+[probe r0] ... nccl 2.27.7        <- PyTorch가 빌드된 NCCL 헤더 버전
+NCCL INFO NCCL version 2.28.3     <- 실제로 로드된 NCCL
+```
+
+torch는 2.27.7로 빌드됐는데 런타임은 2.28.3입니다. NCCL은 major 2 안에서 ABI 호환을
+지키므로 보통은 문제없지만, **플러그인까지 끼면 얘기가 달라집니다.**
+플러그인 v10은 또 다른 세 번째 버전 기준으로 빌드된 물건입니다.
 
 ---
 
 ## 준비
 
-**`git pull` 필요** (`a3d213a` — NCCL 프로브 추가).
+**`git pull` 필요** (`4f8f120` — `NCCL_NET_PLUGIN` 등 forward 추가).
 
 ```bash
 cd /mgmt/server/poc-platform/poc-platform-pub
@@ -82,103 +87,101 @@ NODE=node25
 IMG=registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell
 ```
 
----
+**먼저 셸 정리를 한 번 해주세요.** 지난 실행 로그에 이렇게 찍혔습니다.
 
-## STEP 1 — 프로브 1장 + INFO 로그 (30초, 지금 제일 중요)
+```
+env into container: ... NCCL_IB_DISABLE= NCCL_IB_HCA= NCCL_SOCKET_IFNAME= ...
+```
+
+셸에 빈 값으로 export가 남아 있습니다. 지금 테스트엔 무해하지만 뒤에서 헷갈립니다.
 
 ```bash
-NCCL_DEBUG=INFO UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
+unset NCCL_IB_DISABLE NCCL_IB_HCA NCCL_SOCKET_IFNAME
+```
+
+---
+
+## STEP 1 — 외부 플러그인 끄기 (30초, 이번 라운드의 본 게임)
+
+```bash
+NCCL_NET_PLUGIN=none NCCL_DEBUG=INFO \
+UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
 ./scripts/nccl_probe.sh --host $NODE --image $IMG --gpus 1
 ```
 
-| 결과 | 의미 |
+**로그에서 확인할 것** — 이 줄이 **사라져야** 적용된 것입니다.
+
+```
+NCCL INFO Successfully loaded external network plugin /opt/hpcx/...
+```
+
+| 결과 | 결론 |
 |---|---|
-| `[probe r0] ALL OK -- 1 ranks` | NCCL은 멀쩡. NeMo/Lightning 쪽으로 다시 봐야 합니다 |
-| **signal 11** | **NCCL 단독 재현 확정.** 프레임워크 전부 무관 |
-
-**`NCCL_DEBUG=INFO` 전체 로그를 꼭 주세요.** 지금까지 세 라운드째 못 받고 있는데,
-이게 NCCL이 죽기 직전 어느 단계까지 갔는지 알려주는 유일한 자료입니다.
-
-제가 볼 줄들입니다.
-
-```
-NCCL INFO Bootstrap : Using ...
-NCCL INFO NET/Plugin ...
-NCCL INFO cudaDriverVersion ...        <- 드라이버 버전
-NCCL INFO ... MNNVL ...                <- MNNVL 탐지 여부
-NCCL INFO ... CUMEM ...                <- cuMem 할당자 사용 여부
-NCCL INFO comm 0x... rank 0 nranks 1 ... <- 여기까지 나오면 init은 통과
-```
+| `[probe r0] ALL OK -- 1 ranks` | **원인 확정.** HPC-X 플러그인입니다 |
+| 여전히 signal 11 | 플러그인 아님 → STEP 2 |
 
 ---
 
-## STEP 2 — 변수 하나씩 (STEP 1이 죽었을 때, 각 30초)
-
-STEP 1과 같은 명령에 앞에 하나씩만 더 붙입니다. 위에서부터 순서대로.
+## STEP 2 — 안 되면 SHARP collnet도 (30초)
 
 ```bash
-# (a) MNNVL 탐지 끄기 — fabric 핸들 경로를 안 건드리게
-NCCL_MNNVL_ENABLE=0 NCCL_DEBUG=INFO ./scripts/nccl_probe.sh --host $NODE --image $IMG --gpus 1
-
-# (b) cuMem 할당자 끄기 — (a)보다 넓게 우회
-NCCL_CUMEM_ENABLE=0 NCCL_DEBUG=INFO ./scripts/nccl_probe.sh --host $NODE --image $IMG --gpus 1
-
-# (c) NVLS 끄기
-NCCL_NVLS_ENABLE=0 NCCL_DEBUG=INFO ./scripts/nccl_probe.sh --host $NODE --image $IMG --gpus 1
-
-# (d) IB 끄기 — 1랭크엔 무관해야 정상이지만, 아니면 그것대로 정보입니다
-NCCL_IB_DISABLE=1 NCCL_DEBUG=INFO ./scripts/nccl_probe.sh --host $NODE --image $IMG --gpus 1
+NCCL_NET_PLUGIN=none NCCL_COLLNET_ENABLE=0 NCCL_DEBUG=INFO \
+UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
+./scripts/nccl_probe.sh --host $NODE --image $IMG --gpus 1
 ```
 
-**통과하는 첫 지점이 곧 원인입니다.** 통과한 변수 이름만 알려주셔도 됩니다.
+그래도 죽으면 플러그인 계열은 전부 아웃입니다. 그 로그를 주세요.
 
 ---
 
-## STEP 3 — 드라이버 버전 (ssh만, `git pull` 불필요)
+## STEP 3 — 8장으로 확대 (STEP 1이나 2가 통과했을 때)
 
-이제 이게 유력 후보로 올라왔습니다. 컨테이너는 CUDA 13.0 / NCCL 2.28.3인데,
-**호스트 드라이버가 그걸 받쳐주지 못하면** 정확히 이런 식으로 무너질 수 있습니다.
+1장이 되면 8장도 되는지 봅니다. 여기서 갈리면 그것도 정보입니다.
 
 ```bash
-ssh $NODE 'nvidia-smi --query-gpu=driver_version,name,compute_cap --format=csv'
-ssh $NODE 'cat /proc/driver/nvidia/version'
-ssh $NODE 'nvidia-smi -q | grep -iE "cluster|clique"'
+NCCL_NET_PLUGIN=none NCCL_DEBUG=INFO \
+UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
+./scripts/nccl_probe.sh --host $NODE --image $IMG
 ```
 
-B300 + CUDA 13.0이면 r580 계열 이상이 필요합니다.
-그보다 낮으면 **드라이버가 원인**이고, 그 경우 NCCL 변수로는 못 고칩니다.
+통과하면 바로 학습으로 갑니다.
 
-마지막 줄(`ClusterUUID` / `CliqueId`)은 여전히 못 받았습니다.
-값이 채워져 있으면 STEP 2 (a)가 유력해집니다.
+```bash
+NCCL_NET_PLUGIN=none \
+UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
+MLPERF_TRAIN_IMAGE_TAR=$TAR \
+./scripts/run_single_node.sh --host $NODE \
+  --benchmark llama31_8b --docker-image $IMG \
+  --tp 8 --pp 1 --mbs 1 --gbs 128 --max-steps 10
+```
 
 ---
 
-## STEP 4 — 참고: H100은 왜 되는가
+## STEP 4 — 플러그인 정보 (ssh만, `git pull` 불필요)
 
-`nvidia-imex` 없이 H100이 잘 도는 건 이 가설과 모순되지 않습니다.
+원인이 확정되면 근거로 남길 것들입니다. STEP 1과 병행해도 됩니다.
 
-| | H100 (HGX) | B300 |
-|---|---|---|
-| MNNVL 존재 | 없음 | 있음 (NVL 랙) |
-| `nvidia-smi -q`의 Fabric 섹션 | 보통 없음 / N/A | **State: Completed 로 나옴** |
-| NCCL의 fabric 핸들 탐지 | 안 함 | 함 |
-
-H100은 GPU가 fabric 소속을 광고하지 않으니 NCCL이 그 경로를 아예 안 탑니다.
-그래서 IMEX가 무관한 게 당연합니다.
-
-**다만 분명히 해둘 것:** 단일 B300 노드에 IMEX가 **필요한 게 아닙니다.**
-필요하다면 설치하자는 얘기가 아니라, NCCL이 그 경로를 시도하지 않게 막자(`=0`)는 얘기입니다.
-그리고 1랭크에서도 죽는 게 확인된 지금, 이 가설의 우선순위도 STEP 3보다 낮습니다.
+```bash
+ssh $NODE "docker run --rm $IMG bash -c '
+  ls -la /opt/hpcx/nccl_rdma_sharp_plugin/lib/
+  cat /opt/hpcx/VERSION 2>/dev/null
+  strings /opt/hpcx/nccl_rdma_sharp_plugin/lib/libnccl-net.so | grep -iE \"^2\\.[0-9]+\\.[0-9]+\" | sort -u | head
+'"
+```
 
 ---
 
 ## STEP 5 — 회신
 
-`Errors`에 붙여주세요. 앞의 두 개면 대개 결론이 납니다.
+`Errors`에 붙여주세요.
 
-1. STEP 1 — **`NCCL_DEBUG=INFO` 전체 로그** (통과했든 죽었든)
-2. STEP 3 — 드라이버 버전
-3. STEP 2 — 어느 변수에서 통과했는지
+1. STEP 1 — 통과 여부 + `NCCL_DEBUG=INFO` 로그
+2. STEP 2 — 했다면 그 결과
+3. STEP 4 — 플러그인 버전
+
+STEP 1이 통과하면 `NCCL_NET_PLUGIN=none`을 런처에 어떻게 넣을지 정리해서 올리겠습니다.
+(단일 노드 학습에는 이 플러그인이 필요 없습니다. 멀티 노드 IB 성능에는 영향이 있을 수
+있어서, 기본값으로 박기보다 GPU 타입 조건부로 두는 쪽을 제안드릴 생각입니다.)
 
 ---
 
@@ -186,22 +189,27 @@ H100은 GPU가 fabric 소속을 광고하지 않으니 NCCL이 그 경로를 아
 
 | 항목 | 결과 |
 |---|---|
-| 크래시 위치 | **`ncclCommInitRank`** — `broadcast_object_list` → NCCL `broadcast` |
-| 크래시 최소 조건 | **GPU 1장, 1랭크.** 통신 상대가 없어도 재현 |
+| 크래시 위치 | **`ncclCommInitRankConfig` 내부.** `Init START` 후 `Init COMPLETE` 없음 |
+| 마지막 로그 | `MNNVL ... cliqueId 0x0 state 3 healthMask 0x80` |
+| 크래시 최소 조건 | **GPU 1장, 1랭크.** 프로브(NCCL init + all-reduce)만으로 재현 |
 | 크래시 모양 | 널 포인터 역참조 (`address not mapped ... at address (nil)`) |
-| NeMo / Megatron / TE / 벤치마크 | **무관.** 1랭크 첫 collective에서 죽음 |
-| 8-GPU 토폴로지 / NVLink / P2P | **무관.** 1랭크엔 존재하지 않음 |
+| 드라이버 | 580.173.02 (r580). `cudaDriverVersion 13000`. **정상** |
+| MNNVL / IMEX | **무관.** `cliqueId 0x0`, MNNVL 소속 아님 |
+| `NCCL_MNNVL_ENABLE=0` | 무효 |
+| `NCCL_CUMEM_ENABLE=0` | 무효 |
+| `NCCL_NVLS_ENABLE=0` | 무효 |
+| `NCCL_IB_DISABLE=1` | 무효 |
+| GPU 인식 | `NVIDIA B300 SXM6 AC sm_103` 정상 |
+| NeMo / Megatron / TE / 벤치마크 | **무관.** 프로브에 없음 |
+| 8-GPU 토폴로지 / NVLink / P2P | **무관.** 1랭크 재현 |
 | NVSwitch fabric | 정상 (fabricmanager active, State Completed / Success) |
-| `dmesg` Xid | 없음. GPU 하드웨어 결함 아님 |
-| blackwell 이미지 | `-sm90`과 동일 빌드. arch list·버전·빌드 해시 전부 같음 |
-| `sm_103` | 문제 아님. `sm_100` cubin이 minor 상위 호환으로 10.3에서 동작 |
+| `dmesg` Xid | 없음 |
+| blackwell 이미지 | `-sm90`과 동일 빌드 |
 | llama31_8b 정밀도 | `bf16`만 허용 — 수정 완료(`d4a11f3`) |
 | llama31_8b TP=1 | sequence parallelism 자동 해제 — 수정 완료(`19cad5e`) |
-| 호스트 IB | NIC 전부 ACTIVE / link up |
-| `nvidia_peermem` | 로드됨 (컨테이너 배너의 "not detected"는 오탐) |
+| 호스트 IB | NIC 전부 ACTIVE / link up, `mlx5_0`~`mlx5_15` 인식 |
 | UCX | 원인 아님. 4프레임 백트레이스는 전역 시그널 핸들러였음 |
 | 런처 코드 | `mlperf_run.sh` / `common.sh` 원본과 동일 |
-| 컨테이너 인자 | `--ipc=host`, `--ulimit memlock=-1`, `--network=host`, IB 패스스루 정상 |
 
 ---
 
