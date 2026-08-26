@@ -155,7 +155,13 @@ scripts/
   vllm/vllm_run.sh, vllm/vllm_bench.sh
   pd/pd_run.sh
   mlperf_*.sh
+  prune_results.sh   MLPerf 결과 트리에서 안 쓰는 벤더 폴더 정리(격리)
 ```
+
+벤치마크 스크립트가 실제로 참조하는 결과 트리 경로는 NVIDIA 뿐입니다
+(`inference_results_*/closed/NVIDIA`, `training_results_*/NVIDIA/...`).
+디스크가 부족하면 `scripts/prune_results.sh <root>`로 나머지 벤더를 확인하고,
+`--apply`로 `_quarantine/`에 격리한 뒤 테스트가 통과하면 지우면 됩니다.
 
 `state.py`가 쓰는 JSON들은 배포 폴더(`poc-platform-latest/`, `poc-platform-dev/` 등) 밖, 공통 상위 폴더의
 디렉토리에 저장됩니다. 기본값은 `POC_PLATFORM_STATE_DIR` 환경변수가 없으면 `.poc_platform_state/`이며,
