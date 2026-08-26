@@ -172,6 +172,7 @@ build_env_exports() {
   local out=""
   for env_name in \
     POC_PLATFORM_DOCKERIMG_DIRS \
+    MLPERF_TRAIN_IMAGE_TAR \
     MLPERF_RUN_CMD \
     MLPERF_ENTRY_SCRIPT \
     MLPERF_MAX_STEPS \
@@ -663,6 +664,12 @@ echo "[INFO] gpu_count=${GPU_COUNT}"
 echo "[INFO] gpu_name=${GPU_NAME}"
 echo "[INFO] cuda_visible_devices=${CUDA_VISIBLE_DEVICES_VALUE}"
 
+# Overriding the image with --docker-image leaves FALLBACK_TAR pointing at the
+# default image's tar, which then loads the wrong image and falls through to a
+# pull. MLPERF_TRAIN_IMAGE_TAR names the matching tar, mirroring
+# MLPERF_INFER_IMAGE_TAR on the inference side.
+FALLBACK_TAR="${MLPERF_TRAIN_IMAGE_TAR:-$FALLBACK_TAR}"
+echo "[INFO] fallback_tar=${FALLBACK_TAR:-<none>}"
 ensure_image "$DOCKER_IMAGE" "$FALLBACK_TAR"
 
 if docker ps -a --format '{{.Names}}' | grep -Fxq "$CONTAINER_NAME"; then
