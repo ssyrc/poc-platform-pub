@@ -299,21 +299,12 @@ DOCKERIMG_DIR="${DATA_ROOT}/dockerimgs"
 LLAMA2_REPO="${MLPERF_ROOT}/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo"
 LLAMA2_IMAGE_SM90="${DOCKER_HUB_IMAGE_PREFIX:-docker.io}/donnmyth/mlperf-nvidia:llama2_70b_lora-pyt-sm90"
 LLAMA2_TAR_SM90="${DOCKERIMG_DIR}/mlperf-nvidia_llama2_70b_lora-pyt-sm90.tar.gz"
-# Untagged upstream default covers sm_100/sm_103 (B200/GB200/GB300); the -sm90
-# tag is the one that adds Hopper. Blackwell parts therefore take this image,
-# not the sm90 one.
-LLAMA2_IMAGE_BLACKWELL="${DOCKER_HUB_IMAGE_PREFIX:-docker.io}/donnmyth/mlperf-nvidia:llama2_70b_lora-pyt"
-LLAMA2_TAR_BLACKWELL="${DOCKERIMG_DIR}/mlperf-nvidia_llama2_70b_lora-pyt.tar.gz"
 LLAMA2_DATA_DIR="${DATA_ROOT}/training_llama2_70b_lora/data"
 LLAMA2_MODEL_DIR="${DATA_ROOT}/training_llama2_70b_lora/model"
 
 LLAMA31_REPO="${MLPERF_ROOT}/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo"
 LLAMA31_IMAGE_SM90="${DOCKER_HUB_IMAGE_PREFIX:-docker.io}/donnmyth/mlperf-nvidia:llama31_8b-pyt-sm90"
 LLAMA31_TAR_SM90="${DOCKERIMG_DIR}/llama31_8b-pyt-sm90.tar"
-# llama31_8b publishes an explicit Blackwell tag (sm_100/sm_103), unlike
-# llama2_70b_lora where that coverage is the untagged upstream default.
-LLAMA31_IMAGE_BLACKWELL="${DOCKER_HUB_IMAGE_PREFIX:-docker.io}/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell"
-LLAMA31_TAR_BLACKWELL="${DOCKERIMG_DIR}/llama31_8b-pyt-blackwell.tar"
 LLAMA31_DATA_DIR="${DATA_ROOT}/training_llama31_8b/8b"
 
 CERT_FILE="${DATA_ROOT}/certs/ca-certificates.crt"
@@ -579,11 +570,11 @@ case "$BENCHMARK" in
         DOCKER_IMAGE="$USER_DOCKER_IMAGE"
         FALLBACK_TAR=""
         ;;
-      B300)
-        DOCKER_IMAGE="${USER_DOCKER_IMAGE:-$LLAMA2_IMAGE_BLACKWELL}"
-        FALLBACK_TAR="$LLAMA2_TAR_BLACKWELL"
-        ;;
-      V100|A100|H100|RTX6000|RTX_PRO_6000)
+      V100|A100|H100|B300|RTX6000|RTX_PRO_6000)
+        # -sm90 is built with NVTE_CUDA_ARCHS="89;90;100a;103a", so despite the
+        # name it also covers Ada and datacenter Blackwell. Keeping every
+        # non-GH200 part on this one image is both wider coverage than the
+        # blackwell-only tag and one less tar to stage offline.
         DOCKER_IMAGE="${USER_DOCKER_IMAGE:-$LLAMA2_IMAGE_SM90}"
         FALLBACK_TAR="$LLAMA2_TAR_SM90"
         ;;
@@ -606,11 +597,8 @@ case "$BENCHMARK" in
         DOCKER_IMAGE="$USER_DOCKER_IMAGE"
         FALLBACK_TAR=""
         ;;
-      B300)
-        DOCKER_IMAGE="${USER_DOCKER_IMAGE:-$LLAMA31_IMAGE_BLACKWELL}"
-        FALLBACK_TAR="$LLAMA31_TAR_BLACKWELL"
-        ;;
-      V100|A100|H100|RTX6000|RTX_PRO_6000)
+      V100|A100|H100|B300|RTX6000|RTX_PRO_6000)
+        # See the llama2_70b_lora branch: -sm90 carries 89;90;100a;103a.
         DOCKER_IMAGE="${USER_DOCKER_IMAGE:-$LLAMA31_IMAGE_SM90}"
         FALLBACK_TAR="$LLAMA31_TAR_SM90"
         ;;
