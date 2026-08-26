@@ -3,192 +3,220 @@
 `Errors`에 올라온 최신 증상에 대해 **지금 실행할 커맨드**만 모아둔 파일입니다.
 `Errors`가 갱신되면 이 파일도 갱신됩니다.
 
-- 갱신: 2026-08-26 (12회차)
-- **원인 확정: HPC-X가 NCCL에 끼워 넣는 외부 플러그인**
+- 갱신: 2026-08-26 (13회차)
+- 이번 목표: **멀티노드**. 단일 노드는 8장 학습까지 통과했습니다.
 
 ---
 
-## 1. 원인
+## 1. 지금 상태
 
-```
-/opt/hpcx/nccl_rdma_sharp_plugin/lib/libnccl-net.so   ("NCCL RDMA Plugin v10")
-```
-
-이 플러그인이 이 이미지의 **NCCL 2.28.3**과 맞지 않아 `ncclCommInitRankConfig` 안에서
-널 포인터를 역참조합니다. `NCCL_NET_PLUGIN=none`으로 안 끼우면 정상 동작합니다.
-
-증거가 다 맞물립니다.
-
-| 관찰 | 설명 |
+| | 상태 |
 |---|---|
-| `at address (nil)` 널 역참조 | ABI 불일치로 NULL 함수 포인터 호출 |
-| GPU **1장**에서도 재현 | 플러그인은 랭크 수와 무관하게 로드됨 |
-| `Init START` 후 `Init COMPLETE` 없음 | comm 초기화 도중 사망 |
-| NCCL 내부 변수 4개 전부 무효 | 문제가 NCCL 내부가 아니었음 |
-| `NCCL_NET_PLUGIN=none` → 통과 | 플러그인만 빼면 됨 |
+| 단일 노드 NCCL (1장) | 통과 |
+| 단일 노드 NCCL (8장) | 통과 |
+| 단일 노드 학습 llama31_8b 8장 | **통과 — 스텝 돌아감** |
+| 멀티노드 | 미확인 |
 
-**한 달 가까이 아키텍처·정밀도·토폴로지를 의심했지만, 전부 아니었습니다.**
-(그 과정에서 정밀도 버그와 TP=1 버그는 실제로 나왔고 고쳤습니다.)
+원인이었던 HPC-X 플러그인은 B300에서 런처가 자동으로 끕니다 (`489dc11`).
 
 ---
 
-## 2. 무엇을 잃는가
+## 2. 멀티노드에서 새로 걸리는 것들
 
-`NCCL_NET_PLUGIN=none`은 NCCL이 **자체 IB/RDMA 전송**으로 돌아가게 합니다.
+단일 노드에서 **한 번도 안 쓰인 경로**가 여기서 처음 동작합니다.
 
-| | 영향 |
-|---|---|
-| 단일 노드 | **없습니다.** 이 플러그인은 노드 간 통신용입니다 |
-| 멀티 노드 | 동작합니다. NCCL 내장 IB가 RDMA를 그대로 씁니다 |
-| 잃는 것 | **SHARP** (스위치 내 in-network reduction). 멀티 노드 allreduce가 느려집니다 |
+| 요소 | 단일 노드 | 멀티노드 |
+|---|---|---|
+| NCCL 네트워크 전송 | 안 씀 (NVLink/SHM) | **씀 — IB** |
+| NIC 자동 바인딩 (`NCCL_IB_HCA`) | 무의미 | **씀** |
+| rendezvous (`MASTER_ADDR:PORT`) | `--standalone` | **씀** |
+| 노드 간 데이터 경로 | 무관 | **양쪽에 있어야 함** |
 
-즉 **성능은 일부 손해, 동작은 정상**입니다.
-근본 해결은 NCCL 2.28과 맞는 HPC-X로 올린 이미지를 쓰는 것인데, 폐쇄망에서 이미지를
-새로 빌드해야 하므로 지금 당장의 답은 아닙니다.
+**특히 NCCL 내장 IB 전송이 여기서 처음 실전 투입됩니다.**
+HPC-X 플러그인을 껐으니 노드 간 통신은 전부 NCCL 자체 IB로 갑니다.
+단일 노드에서는 이 경로가 안 쓰였기 때문에, 여기가 이번 라운드의 진짜 미지수입니다.
 
 ---
 
-## 3. 런처에 반영했습니다
+## 3. 순서 — 학습부터 돌리지 마세요
 
-`mlperf_train_v51.sh`(두 벤치마크 분기), `mlperf_train_v41.sh`에 넣었습니다.
-
-```bash
-if [[ "${MLPERF_GPU_TYPE:-}" == "B300" && -z "${NCCL_NET_PLUGIN:-}" ]]; then
-  export NCCL_NET_PLUGIN="none"
-fi
-```
-
-- **B300에서만** 적용합니다. 크래시가 증명된 곳이 거기뿐이고,
-  다른 GPU에서는 SHARP를 괜히 버릴 이유가 없습니다.
-- **직접 지정하면 그대로 존중합니다.** 양방향 모두 덮어쓸 수 있습니다.
-- 적용되면 로그에 한 줄 남습니다.
+지난 2주가 그래서 길어졌습니다. 싼 것부터 갑니다.
 
 ```
-[CONTAINER] B300: NCCL_NET_PLUGIN=none (HPC-X plugin crashes ncclCommInitRankConfig; using NCCL built-in IB, no SHARP)
+2번 노드 점검  →  멀티노드 NCCL 프로브  →  멀티노드 학습
+   1분              30초                    5분
 ```
 
 ---
 
 ## 준비
 
-**`git pull` 필요** (`489dc11` — B300 기본값 반영).
+**`git pull` 필요** (`2599300` — 프로브 멀티노드 지원).
 
 ```bash
 cd /mgmt/server/poc-platform/poc-platform-pub
 git pull
 
-NODE=node25
-TAR=/mgmt/server/poc-platform/data/dockerimgs/llama31_8b_pyt-blackwell.tar
+N1=node25          # 지금까지 쓰던 노드 = rank 0
+N2=<두 번째 노드 IP>
 IMG=registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell
+TAR=/mgmt/server/poc-platform/data/dockerimgs/llama31_8b_pyt-blackwell.tar
 ```
 
 ---
 
-## STEP 1 — 프로브 8장 (30초)
+## STEP 1 — 2번 노드 점검 (1분)
 
-1장은 됐으니 8장을 확인합니다. 여기서 갈리면 그것도 정보입니다.
+1번 노드는 검증됐지만 2번은 아직 아무것도 확인 안 했습니다.
+
+```bash
+./scripts/node_check.sh --host $N2 --image $IMG
+```
+
+`MISS`가 있으면 먼저 해결하세요. 특히 이 세 가지:
+
+- **이미지가 2번 노드에도 있어야 합니다** — 없으면 `docker load -i $TAR`
+- `nvidia-fabricmanager` active
+- `/dev/infiniband/*` 존재, IB 링크 Active
+
+두 노드 사이 **rendezvous 포트(기본 29500)**도 열려 있어야 합니다.
+
+```bash
+ssh $N2 "nc -zv $N1 29500" 2>&1 | tail -1     # 또는 방화벽 정책 확인
+```
+
+---
+
+## STEP 2 — 멀티노드 NCCL 프로브 (30초, 핵심)
+
+**이번 라운드의 본 게임입니다.** all-reduce가 실제로 네트워크를 건넙니다.
 
 ```bash
 NCCL_NET_PLUGIN=none NCCL_DEBUG=INFO \
 UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
-./scripts/nccl_probe.sh --host $NODE --image $IMG
+./scripts/nccl_probe.sh --hosts $N1,$N2 --image $IMG
 ```
 
-`[probe r0] ALL OK -- 8 ranks`가 나오면 통과입니다.
+성공하면 이렇게 끝납니다.
+
+```
+[probe r0] all_reduce OK (= 16)
+[INFO] per-host result:
+  rank 0   node25    exit=0
+  rank 1   <N2>            exit=0
+[INFO] multi-node NCCL OK across 2 nodes
+```
+
+`= 16`이 핵심입니다 — 16랭크가 전부 참여했다는 뜻이고, 값이 다르면 통신이 샌 겁니다.
+
+**INFO 로그에서 볼 것**
+
+```
+NCCL INFO NET/IB : Using [0]mlx5_0:1/IB ...   <- 어느 NIC를 골랐는지
+NCCL INFO ... via NET/IB/...                  <- 노드 간 경로가 IB인지 (Socket이면 느립니다)
+```
+
+| 증상 | 손볼 곳 |
+|---|---|
+| rendezvous에서 멈춤 | 포트 방화벽, `MASTER_ADDR` 도달성 |
+| `Socket` 경유로 붙음 | `NCCL_IB_HCA` / `NCCL_SOCKET_IFNAME` 명시 필요 |
+| signal 11 | NCCL 내장 IB 문제. INFO 로그 주세요 |
+
+NIC를 직접 지정해야 하면 이렇게 붙입니다 (프로브와 학습 양쪽 다 forward됩니다).
+
+```bash
+NCCL_IB_HCA=mlx5_0,mlx5_1,mlx5_4,mlx5_5 NCCL_SOCKET_IFNAME=bond0.3061 ...
+```
 
 ---
 
-## STEP 2 — 실제 학습 (llama31_8b, 8장)
+## STEP 3 — 멀티노드 학습
 
-이제 `NCCL_NET_PLUGIN`을 안 줘도 됩니다. B300이면 런처가 알아서 넣습니다.
+프로브가 통과한 다음에만.
 
 ```bash
 UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
 MLPERF_TRAIN_IMAGE_TAR=$TAR \
-./scripts/run_single_node.sh --host $NODE \
+./scripts/run_multi_node.sh --hosts $N1,$N2 \
   --benchmark llama31_8b --docker-image $IMG \
-  --tp 8 --pp 1 --mbs 1 --gbs 128 --max-steps 10
+  --tp 8 --pp 1 --cp 1 --mbs 1 --gbs 256 --max-steps 10
 ```
 
-**로그에서 확인할 것**
+**GBS가 왜 256인지**
 
 ```
-[CONTAINER] B300: NCCL_NET_PLUGIN=none ...     <- 기본값이 걸렸는지
-++trainer.precision=bf16                        <- 정밀도 수정이 살아있는지
+WORLD = 8 GPU x 2 node = 16
+DP    = WORLD / (TP x PP x CP) = 16 / 8 = 2
+GBS는 MBS(1) x DP(2) = 2 의 배수여야 함
+GBS=256 → grad_accum = 256 / 2 = 128
 ```
 
----
+단일 노드(GBS=128, DP=1)와 스텝당 샘플 수를 맞추려면 256이 맞습니다.
+런처가 실행 전에 이 계산을 검증하고 로그로 찍습니다.
 
-## STEP 3 — llama2_70b_lora (원래 목표였던 벤치마크)
+```
+[INFO] parallel: TP=8 PP=1 CP=1 -> DP=2 (world=16)
+[INFO] batch:    MBS=1 GBS=256 grad_accum=128
+```
 
-8b가 돌면 원래 하려던 것으로 돌아갑니다. 이미지가 다릅니다.
+**데이터는 양쪽 노드에서 같은 경로로 보여야 합니다.**
+공유 스토리지면 그대로 되고, 아니면 2번 노드에도 복사해야 합니다.
 
 ```bash
-UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
-./scripts/run_single_node.sh --host $NODE \
-  --benchmark llama2_70b_lora \
-  --tp 8 --pp 1 --mbs 1 --gbs 128 --max-steps 10
-```
-
-이건 `-sm90` 기본 이미지를 씁니다. 같은 HPC-X 플러그인이 들어 있으므로
-같은 수정으로 같이 풀릴 것으로 봅니다. 아니면 그 로그를 주세요.
-
----
-
-## STEP 4 — 멀티 노드 (단일 노드가 다 되고 나서)
-
-여기서부터 SHARP 손실이 실제로 드러납니다. 동작은 해야 합니다.
-
-```bash
-./scripts/run_multi_node.sh --hosts <노드1>,<노드2> \
-  --benchmark llama31_8b --docker-image $IMG \
-  --tp 8 --pp 1 --mbs 1 --gbs 256 --max-steps 10
+ssh $N2 'ls /mgmt/server/poc-platform/data/training_llama31_8b/8b | head'
 ```
 
 ---
 
-## STEP 5 — 회신
+## STEP 4 — 회신
 
-1. STEP 1 — 8랭크 프로브 통과 여부
-2. STEP 2 — 학습이 스텝을 도는지, 몇 스텝까지
-3. STEP 3 — lora도 같이 풀리는지
+1. STEP 1 — 2번 노드 `node_check` 결과
+2. STEP 2 — 프로브 통과 여부 + `NET/IB` 줄
+3. STEP 3 — 학습이 스텝을 도는지
 
 ---
 
-## 이 건에서 실제로 고친 것들
+## 참고 — 성능은 지금 최적이 아닙니다
+
+B300에서 HPC-X 플러그인을 껐으므로 **SHARP**(스위치 내 in-network reduction)가 빠집니다.
+멀티노드 allreduce가 원래보다 느립니다. **동작에는 문제없고 벤치마크 수치만 손해입니다.**
+
+되찾으려면 NCCL 2.28과 맞는 HPC-X가 든 이미지가 필요합니다 — 호스트 작업이 아닙니다.
+
+정식 측정 전에 이 부분을 어떻게 할지 정하시면 됩니다. 지금은 **동작 확인이 먼저**입니다.
+
+---
+
+## 이 건에서 고친 것들
 
 | 커밋 | 내용 |
 |---|---|
-| `d4a11f3` | llama31_8b 정밀도 — `bf16-mixed` → `bf16` (pretrain.py가 `bf16`만 허용) |
+| `d4a11f3` | llama31_8b 정밀도 — `bf16-mixed` → `bf16` |
 | `19cad5e` | TP=1일 때 sequence parallelism 자동 해제 |
-| `76a7fc8` | `--docker-image`에 맞는 tar를 `MLPERF_TRAIN_IMAGE_TAR`로 지정 가능 |
-| `a3d213a` | `scripts/nccl_probe.sh` — NCCL만 30초에 판정하는 프로브 |
-| `cd1e79e`, `43b7edb`, `fcab584` | NCCL/UCX 디버그 변수 forward |
-| `489dc11` | B300에서 `NCCL_NET_PLUGIN=none` 기본 적용 |
+| `76a7fc8` | `MLPERF_TRAIN_IMAGE_TAR`로 이미지에 맞는 tar 지정 |
+| `489dc11` | **B300에서 `NCCL_NET_PLUGIN=none` 기본 적용 — SIGSEGV 원인** |
+| `a3d213a`, `2599300` | `nccl_probe.sh` — NCCL만 30초 검증, 단일/멀티 |
 
 ---
 
-## 확인된 사실 (기록용)
+## 확정된 사실 (기록용)
 
 | 항목 | 결과 |
 |---|---|
-| **원인** | **HPC-X `libnccl-net.so` v10 ↔ NCCL 2.28.3 불일치** |
-| **해결** | **`NCCL_NET_PLUGIN=none`** (B300 기본값으로 반영) |
+| **SIGSEGV 원인** | **HPC-X `libnccl-net.so` v10 ↔ 이미지의 NCCL 2.28.3 불일치** |
+| **해결** | **`NCCL_NET_PLUGIN=none`** (B300 기본값) |
 | 크래시 위치 | `ncclCommInitRankConfig` 내부 |
-| 최소 재현 | GPU 1장, 1랭크, NCCL init + all-reduce |
+| 최소 재현 | GPU 1장, 1랭크 |
 | 드라이버 | 580.173.02 (r580) — 정상 |
-| MNNVL / IMEX | 무관. `cliqueId 0x0` |
+| MNNVL / IMEX | 무관. `cliqueId 0x0`. 단일 노드에 IMEX 불필요 |
 | `sm_103` | 무관. `sm_100` cubin이 minor 상위 호환 |
 | blackwell 이미지 | `-sm90`과 동일 빌드 |
 | NVSwitch fabric | 정상 |
-| `dmesg` Xid | 없음 |
-| NeMo / Megatron / TE | 무관 |
-| torch 빌드 NCCL | 2.27.7 (런타임은 2.28.3) — 지금 문제와는 별개 |
+| 호스트 NCCL / HPC-X | **컨테이너와 무관.** 이미지가 자체적으로 들고 있음 |
 
 ---
 
 ## 참고 — 정리해두면 좋은 것
 
-`Errors`에 노드 IP(`node25`), 호스트명(`node-26049`), 사내 레지스트리
-주소(`registry.internal`)가 들어가 있습니다. 이 저장소는 public입니다.
-원하시면 익명화해 드리겠습니다.
+`Errors`에 노드 IP, 호스트명, 사내 레지스트리 주소가 들어가 있습니다.
+이 저장소는 public입니다. 원하시면 익명화해 드리겠습니다.
