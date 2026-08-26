@@ -178,3 +178,78 @@ Build cuda_13.0.r13.0/compiler.36424714_0
 2.9.0a0+50eac811a6.nv25.09 13.0
 ['sm_75', 'sm_80', 'sm_86', 'sm_90', 'sm_100', 'sm_120', 'compute_120']
 
+
+
+
+
+### llama31_8b 에러
+[node25] Error executing job with overrides: ['++trainer.devices=8', '++trainer.num_nodes=1', '++trainer.max_steps=10', '++trainer.limit_val_batches=1', '++trainer.val_check_interval=10', '++trainer.log_every_n_steps=1', '++trainer.enable_progress_bar=true', '++trainer.precision=bf16-mixed', '++model.base_config=8b', '++model.tokenizer.model=/preproc_data/tokenizer', '++model.data.mock_dataset=false', '++model.tensor_model_parallel_size=8', '++model.pipeline_model_parallel_size=1', '++model.context_parallel_size=1', '++model.micro_batch_size=1', '++model.global_batch_size=128', '++model.encoder_seq_length=8192', '++model.optim.lr=0.0008', '++model.optim.sched.warmup_steps=2', '++model.custom.target_log_ppl=3.3', '++model.fp8=False', '++model.fp8_hybrid=False', '++exp_manager.explicit_log_dir=/opt/poc-platform/mlperf_logs_train_v51/20260827_035547_node25_training_v5.1_llama31_8b_trainingv51_single_20260827_035545/results', '++model.virtual_pipeline_model_parallel_size=null']
+[node25] Traceback (most recent call last):
+[node25]   File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 751, in <module>
+[node25] Error executing job with overrides: ['++trainer.devices=8', '++trainer.num_nodes=1', '++trainer.max_steps=10', '++trainer.limit_val_batches=1', '++trainer.val_check_interval=10', '++trainer.log_every_n_steps=1', '++trainer.enable_progress_bar=true', '++trainer.precision=bf16-mixed', '++model.base_config=8b', '++model.tokenizer.model=/preproc_data/tokenizer', '++model.data.mock_dataset=false', '++model.tensor_model_parallel_size=8', '++model.pipeline_model_parallel_size=1', '++model.context_parallel_size=1', '++model.micro_batch_size=1', '++model.global_batch_size=128', '++model.encoder_seq_length=8192', '++model.optim.lr=0.0008', '++model.optim.sched.warmup_steps=2', '++model.custom.target_log_ppl=3.3', '++model.fp8=False', '++model.fp8_hybrid=False', '++exp_manager.explicit_log_dir=/opt/poc-platform/mlperf_logs_train_v51/20260827_035547_node25_training_v5.1_llama31_8b_trainingv51_single_20260827_035545/results', '++model.virtual_pipeline_model_parallel_size=null']
+[node25]     main()
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/main.py", line 94, in decorated_main
+[node25] Traceback (most recent call last):
+[node25]   File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 751, in <module>
+[node25]     _run_hydra(
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+[node25]     _run_app(
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 457, in _run_app
+[node25]     run_and_report(
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 223, in run_and_report
+[node25]     raise ex
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 220, in run_and_report
+[node25]         return func()main()
+[node25]
+[node25]      File "/usr/local/lib/python3.12/dist-packages/hydra/main.py", line 94, in decorated_main
+[node25]            _run_hydra(
+[node25] ^^  File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+[node25] ^^^^
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 458, in <lambda>
+[node25]     _run_app(
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 457, in _run_app
+[node25]     lambda: hydra.run(
+[node25]        run_and_report(
+[node25]     File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 223, in run_and_report
+[node25]           raise ex^
+[node25] ^^^  File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 220, in run_and_report
+[node25] ^^^    return func()^
+[node25] ^^
+[node25]     File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/hydra.py", line 132, in run
+[node25]             _ = ret.return_value
+[node25] ^^^^^ ^
+[node25]     File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 458, in <lambda>
+[node25]     ^^^^    lambda: hydra.run(^
+[node25] ^^ ^ ^ ^ ^ ^ ^ ^ ^  ^
+[node25]  ^  File "/usr/local/lib/python3.12/dist-packages/hydra/core/utils.py", line 260, in return_value
+[node25] ^^^^^^^^    ^raise self._return_value
+[node25]
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/hydra.py", line 132, in run
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/core/utils.py", line 186, in run_job
+[node25]     _ = ret.return_value
+[node25]     ret.return_value = task_function(task_cfg)
+[node25]           ^ ^  ^ ^ ^^ ^ ^ ^ ^ ^ ^^ ^ ^ ^
+[node25]      File "/usr/local/lib/python3.12/dist-packages/hydra/core/utils.py", line 260, in return_value
+[node25]   ^^^    ^raise self._return_value^
+[node25] ^^^^  File "/usr/local/lib/python3.12/dist-packages/hydra/core/utils.py", line 186, in run_job
+[node25] ^^^^^^    ^ret.return_value = task_function(task_cfg)^
+[node25] ^^^ ^ ^ ^
+[node25]     File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 657, in main
+[node25]             Error executing job with overrides: ['++trainer.devices=8', '++trainer.num_nodes=1', '++trainer.max_steps=10', '++trainer.limit_val_batches=1', '++trainer.val_check_interval=10', '++trainer.log_every_n_steps=1', '++trainer.enable_progress_bar=true', '++trainer.precision=bf16-mixed', '++model.base_config=8b', '++model.tokenizer.model=/preproc_data/tokenizer', '++model.data.mock_dataset=false', '++model.tensor_model_parallel_size=8', '++model.pipeline_model_parallel_size=1', '++model.context_parallel_size=1', '++model.micro_batch_size=1', '++model.global_batch_size=128', '++model.encoder_seq_length=8192', '++model.optim.lr=0.0008', '++model.optim.sched.warmup_steps=2', '++model.custom.target_log_ppl=3.3', '++model.fp8=False', '++model.fp8_hybrid=False', '++exp_manager.explicit_log_dir=/opt/poc-platform/mlperf_logs_train_v51/20260827_035547_node25_training_v5.1_llama31_8b_trainingv51_single_20260827_035545/results', '++model.virtual_pipeline_model_parallel_size=null']
+[node25]     ^^^^^^^^^^^^^^^^^^^^^^^
+[node25]   File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 657, in main
+[node25]     model, precision = get_model_with_precision(cfg, data.tokenizer)
+[node25]                        ^^^^Traceback (most recent call last):
+[node25] ^^^^  File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 751, in <module>
+[node25] ^    ^model, precision = get_model_with_precision(cfg, data.tokenizer)^^
+[node25] ^^^^ ^ ^ ^ ^ ^ ^ ^  ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^  ^^^^^^^^^^^^^^^^^^
+[node25] ^^  File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 291, in get_model_with_precision
+[node25] ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^    ^^main()^
+[node25]
+[node25]     assert False, f"Unsupported precision {config.trainer.precision}"  File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 291, in get_model_with_precision
+[node25]
+[node25]    File "/usr/local/lib/python3.12/dist-packages/hydra/main.py", line 94, in decorated_main
+[node25]               ^_run_hydra(^
+[node25] ^^^  File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+[node25]
+[node25] AssertionError: Unsupported precision bf16-mixed
