@@ -77,7 +77,7 @@ torch는 2.27.7로 빌드됐는데 런타임은 2.28.3입니다. NCCL은 major 2
 
 ## 준비
 
-**`git pull` 필요** (`4f8f120` — `NCCL_NET_PLUGIN` 등 forward 추가).
+**`git pull` 필요** (`fcab584` — `NCCL_NET_PLUGIN` 등 forward 추가).
 
 ```bash
 cd /mgmt/server/poc-platform/poc-platform-pub
