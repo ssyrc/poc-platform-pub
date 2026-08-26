@@ -1,281 +1,54 @@
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764393682, "event_type": "INTERVAL_START", "key": "init_start", "value": null, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 490}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764393682, "event_type": "POINT_IN_TIME", "key": "submission_benchmark", "value": "llama2_70b_lora", "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 491}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764393682, "event_type": "POINT_IN_TIME", "key": "submission_org", "value": "SUBMISSION_ORG_PLACEHOLDER", "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 491}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764393682, "event_type": "POINT_IN_TIME", "key": "submission_division", "value": "closed", "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 491}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764393682, "event_type": "POINT_IN_TIME", "key": "submission_status", "value": "onprem", "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 491}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764393682, "event_type": "POINT_IN_TIME", "key": "submission_platform", "value": "1xSUBMISSION_PLATFORM_PLACEHOLDER", "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 491}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764393682, "event_type": "POINT_IN_TIME", "key": "target_accuracy", "value": 0.925, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 494}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764393772, "event_type": "POINT_IN_TIME", "key": "opt_base_learning_rate", "value": 0.0004, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 276}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764393772, "event_type": "POINT_IN_TIME", "key": "opt_adamw_weight_decay", "value": 0.0001, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 277}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764393772, "event_type": "POINT_IN_TIME", "key": "opt_gradient_clip_norm", "value": 0.3, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 278}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764393772, "event_type": "POINT_IN_TIME", "key": "opt_learning_rate_warmup_factor", "value": 0.0, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 303}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764393775, "event_type": "POINT_IN_TIME", "key": "lora_rank", "value": 16, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 312}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764393775, "event_type": "POINT_IN_TIME", "key": "lora_alpha", "value": 32, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 313}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764393780, "event_type": "POINT_IN_TIME", "key": "opt_learning_rate_training_steps", "value": 10, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 514}}
-[node19] [2026-08-26 17:13:13,786][nemo.lightning.pytorch.strategies.megatron_strategy][INFO] - Initializing distributed: GLOBAL_RANK: 2, MEMBER: 3/8
-[node19] [2026-08-26 17:13:13,786][nemo.lightning.pytorch.strategies.megatron_strategy][INFO] - Initializing distributed: GLOBAL_RANK: 1, MEMBER: 2/8
-[node19] [2026-08-26 17:13:13,786][nemo.lightning.pytorch.strategies.megatron_strategy][INFO] - Initializing distributed: GLOBAL_RANK: 4, MEMBER: 5/8
-[node19] [2026-08-26 17:13:13,786][nemo.lightning.pytorch.strategies.megatron_strategy][INFO] - Initializing distributed: GLOBAL_RANK: 6, MEMBER: 7/8
-[node19] GPU available: True (cuda), used: True
-[node19] TPU available: False, using: 0 TPU cores
-[node19] HPU available: False, using: 0 HPUs
-[node19] `Trainer(limit_val_batches=1)` was configured so 1 batch will be used.
-[node19] [Gloo] Rank 0 is connected to [Gloo] Rank 0 peer ranks. 0Expected number of connected peer ranks is :  is connected to 00 peer ranks. Expected number of connected peer ranks is :
-[node19] [Gloo] Rank 0
-[node19] 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [2026-08-26 17:13:13,837][nemo.lightning.pytorch.strategies.megatron_strategy][INFO] - Initializing distributed: GLOBAL_RANK: 3, MEMBER: 4/8
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [2026-08-26 17:13:13,855][nemo.lightning.pytorch.strategies.megatron_strategy][INFO] - Initializing distributed: GLOBAL_RANK: 5, MEMBER: 6/8
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [2026-08-26 17:13:13,877][nemo.lightning.pytorch.strategies.megatron_strategy][INFO] - Initializing distributed: GLOBAL_RANK: 7, MEMBER: 8/8
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764394358, "event_type": "POINT_IN_TIME", "key": "global_batch_size", "value": 128, "metadata": {"file": "/usr/local/lib/python3.12/dist-packages/mlperf_common/callbacks/logging.py", "lineno": 297}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764394379, "event_type": "POINT_IN_TIME", "key": "train_samples", "value": 3901, "metadata": {"file": "/usr/local/lib/python3.12/dist-packages/mlperf_common/callbacks/logging.py", "lineno": 297}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764394379, "event_type": "POINT_IN_TIME", "key": "eval_samples", "value": 173, "metadata": {"file": "/usr/local/lib/python3.12/dist-packages/mlperf_common/callbacks/logging.py", "lineno": 297}}
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764394379, "event_type": "POINT_IN_TIME", "key": "gradient_accumulation_steps", "value": 1, "metadata": {"file": "/usr/local/lib/python3.12/dist-packages/mlperf_common/callbacks/logging.py", "lineno": 297}}
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] Experiments will be logged at /mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/nemo_experiments/default/2026-08-26_17-13-14
-[node19] :::MLLOG {"namespace": "", "time_ms": 1787764394384, "event_type": "POINT_IN_TIME", "key": "seed", "value": 1, "metadata": {"file": "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama2_70b_lora/implementations/nemo/train.py", "lineno": 563}}
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] Rank 0 has data parallel group : [0]
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] Rank 0 has combined group of data parallel and context parallel : [0]
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] All data parallel group ranks with context parallel combined: [[0], [1], [2], [3], [4], [5], [6], [7]]
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] Ranks 0 has data parallel rank: 0
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] Rank 0 has context parallel group: [0]
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] All context parallel group ranks: [[0], [1], [2], [3], [4], [5], [6], [7]]
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] Ranks 0 has context parallel rank: 0
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] Rank 0 has model parallel group: [0, 1, 2, 3, 4, 5, 6, 7]
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] All model parallel group ranks: [[0, 1, 2, 3, 4, 5, 6, 7]]
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] Rank 0 has tensor model parallel group: [0, 1, 2, 3, 4, 5, 6, 7]
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] All tensor model parallel group ranks: [[0, 1, 2, 3, 4, 5, 6, 7]]
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] Rank 0 has tensor model parallel rank: 0
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] All expert tensor parallel group ranks: [[0, 1, 2, 3, 4, 5, 6, 7]]
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] Rank 0 has expert tensor parallel rank: 0
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] Rank 0 has pipeline model parallel group: [0]
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] Rank 0 has embedding group: [0]
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] All pipeline model parallel group ranks: [[0], [1], [2], [3], [4], [5], [6], [7]]
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] Rank 0 has pipeline model parallel rank 0
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] All embedding group ranks: [[0], [1], [2], [3], [4], [5], [6], [7]]
-[node19] [NeMo I 2026-08-26 17:13:14 nemo_logging:393] Rank 0 has embedding rank: 0
-[node19] [2026-08-26 17:13:14,389][nemo.lightning.pytorch.strategies.megatron_strategy][INFO] - Initializing distributed: GLOBAL_RANK: 0, MEMBER: 1/8
-[node19] ----------------------------------------------------------------------------------------------------
-[node19] distributed_backend=nccl
-[node19] All distributed processes registered. Starting with 8 processes
-[node19] ----------------------------------------------------------------------------------------------------
-[node19]
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
-[node19] NCCL version 2.28.3+cuda13.0
-[node19] W0826 17:13:39.419000 1 torch/distributed/elastic/multiprocessing/api.py:906] Sending process 314 closing signal SIGTERM
-[node19] W0826 17:13:39.419000 1 torch/distributed/elastic/multiprocessing/api.py:906] Sending process 315 closing signal SIGTERM
-[node19] W0826 17:13:39.420000 1 torch/distributed/elastic/multiprocessing/api.py:906] Sending process 316 closing signal SIGTERM
-[node19] W0826 17:13:39.420000 1 torch/distributed/elastic/multiprocessing/api.py:906] Sending process 317 closing signal SIGTERM
-[node19] W0826 17:13:39.420000 1 torch/distributed/elastic/multiprocessing/api.py:906] Sending process 318 closing signal SIGTERM
-[node19] W0826 17:13:39.421000 1 torch/distributed/elastic/multiprocessing/api.py:906] Sending process 319 closing signal SIGTERM
-[node19] W0826 17:13:39.421000 1 torch/distributed/elastic/multiprocessing/api.py:906] Sending process 321 closing signal SIGTERM
-[node19] E0826 17:13:40.188000 1 torch/distributed/elastic/multiprocessing/api.py:880] failed (exitcode: -11) local_rank: 6 (pid: 320) of binary: /usr/bin/python
-[node19] Traceback (most recent call last):
-[node19]   File "/usr/local/bin/torchrun", line 7, in <module>
-[node19]     sys.exit(main())
-[node19]              ^^^^^^
-[node19]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 357, in wrapper
-[node19]     return f(*args, **kwargs)
-[node19]            ^^^^^^^^^^^^^^^^^^
-[node19]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 936, in main
-[node19]     run(args)
-[node19]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 927, in run
-[node19]     elastic_launch(
-[node19]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 151, in __call__
-[node19]     return launch_agent(self._config, self._entrypoint, list(args))
-[node19]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[node19]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 288, in launch_agent
-[node19]     raise ChildFailedError(
-[node19] torch.distributed.elastic.multiprocessing.errors.ChildFailedError:
-[node19] =====================================================
-[node19] train.py FAILED
-[node19] -----------------------------------------------------
-[node19] Failures:
-[node19]   <NO_OTHER_FAILURES>
-[node19] -----------------------------------------------------
-[node19] Root Cause (first observed failure):
-[node19] [0]:
-[node19]   time      : 2026-08-26_17:13:39
-[node19]   host      : node-26043
-[node19]   rank      : 6 (local_rank: 6)
-[node19]   exitcode  : -11 (pid: 320)
-[node19]   error_file: <N/A>
-[node19]   traceback : Signal 11 (SIGSEGV) received by PID 320
-[node19] =====================================================
-[node19] [FATAL] command failed at line 982: "${DOCKER_CMD[@]}"
-[node19] [PHASE] collect
-[node19] [INFO] docker_exit_code=1
-[node19] [PHASE] done
-[node19] MLPerf_RESULT_JSON={"status":"failed","run_id":"trainingv51_single_20260827_021243","host":"node19","gpu_type":"B300","suite":"training","mlperf_version":"v5.1","benchmark":"llama2_70b_lora","docker_image":"docker.io/donnmyth/mlperf-nvidia:llama2_70b_lora-pyt-sm90","docker_container":"mlperf_train_v51_trainingv51_single_20260827_021243","start_time":"2026-08-27T02:12:45+09:00","end_time":"2026-08-27T02:13:41+09:00","duration_sec":56,"log_dir":"/opt/poc-platform/mlperf_logs_train_v51/20260827_021245_node19_training_v5.1_llama2_70b_lora_trainingv51_single_20260827_021243","exit_code":1,"result_hint":"training v5.1 failed; inspect run.log and command.txt"}
-[PHASE] collect
-[INFO] host=node19 exit_code=1
-[PHASE] done
-
-[root@node-26043 poc-platform-pub]# ssh $NODE "docker run --rm --gpus all $IMAGE bash -c '
-echo \"NVTE_CUDA_ARCHS=\$NVTE_CUDA_ARCHS\"
-nvcc --version | tail -2
-python -c \"import torch; print(torch.__version__, torch.version.cuda); print(torch.cuda.get_arch_list())\"
-'"
-Warning: Permanently added 'node19' (ED25519) to the list of known hosts.
-
-=============
-== PyTorch ==
-=============
-
-NVIDIA Release 25.09 (build 210907837)
-PyTorch Version 2.9.0a0+50eac81
-Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-Copyright (c) 2014-2024 Facebook Inc.
-Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
-Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
-Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
-Copyright (c) 2011-2013 NYU                      (Clement Farabet)
-Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
-Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
-Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
-Copyright (c) 2015      Google Inc.
-Copyright (c) 2015      Yangqing Jia
-Copyright (c) 2013-2016 The Caffe contributors
-All rights reserved.
-
-Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
-
-GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
-(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
-and the Product-Specific Terms for NVIDIA AI Products
-(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
-
-NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
-      detected.  Multi-node communication performance may be reduced.
-
-NOTE: The SHMEM allocation limit is set to the default of 64MB.  This may be
-   insufficient for PyTorch.  NVIDIA recommends the use of the following flags:
-   docker run --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 ...
-
-NVTE_CUDA_ARCHS=
-Cuda compilation tools, release 13.0, V13.0.88
-Build cuda_13.0.r13.0/compiler.36424714_0
-/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:63: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
-  import pynvml  # type: ignore[import]
-2.9.0a0+50eac811a6.nv25.09 13.0
-['sm_75', 'sm_80', 'sm_86', 'sm_90', 'sm_100', 'sm_120', 'compute_120']
-
-
-
-
-
-### llama31_8b 에러
-[root@node-26049 poc-platform-pub]# docker images | grep -i llama31_8b
-registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell   7986ff4e8953       25.2GB             0B   
-[root@node-26049 poc-platform-pub]# docker run --rm --gpus all $IMG python -c 'import torch; print(torch.cuda.get_arch_list())'
-
-=============
-== PyTorch ==
-=============
-
-NVIDIA Release 25.09 (build 210907837)
-PyTorch Version 2.9.0a0+50eac81
-Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-Copyright (c) 2014-2024 Facebook Inc.
-Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
-Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
-Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
-Copyright (c) 2011-2013 NYU                      (Clement Farabet)
-Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
-Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
-Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
-Copyright (c) 2015      Google Inc.
-Copyright (c) 2015      Yangqing Jia
-Copyright (c) 2013-2016 The Caffe contributors
-All rights reserved.
-
-Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
-
-GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
-(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
-and the Product-Specific Terms for NVIDIA AI Products
-(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
-
-NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
-      detected.  Multi-node communication performance may be reduced.
-
-NOTE: The SHMEM allocation limit is set to the default of 64MB.  This may be
-   insufficient for PyTorch.  NVIDIA recommends the use of the following flags:
-   docker run --gpus all --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 ...
-
-/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:63: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
-  import pynvml  # type: ignore[import]
-['sm_75', 'sm_80', 'sm_86', 'sm_90', 'sm_100', 'sm_120', 'compute_120']
-
-
-[node25] Error executing job with overrides: ['++trainer.devices=1', '++trainer.num_nodes=1', '++trainer.max_steps=5', '++trainer.limit_val_batches=1', '++trainer.val_check_interval=10', '++trainer.log_every_n_steps=1', '++trainer.enable_progress_bar=true', '++trainer.precision=bf16', '++model.base_config=8b', '++model.tokenizer.model=/preproc_data/tokenizer', '++model.data.mock_dataset=false', '++model.tensor_model_parallel_size=1', '++model.pipeline_model_parallel_size=1', '++model.context_parallel_size=1', '++model.micro_batch_size=1', '++model.global_batch_size=8', '++model.encoder_seq_length=8192', '++model.optim.lr=0.0008', '++model.optim.sched.warmup_steps=2', '++model.custom.target_log_ppl=3.3', '++model.fp8=False', '++model.fp8_hybrid=False', '++exp_manager.explicit_log_dir=/opt/poc-platform/mlperf_logs_train_v51/20260827_041705_node25_training_v5.1_llama31_8b_trainingv51_single_20260827_041704/results', '++model.virtual_pipeline_model_parallel_size=null']
+[node25] ----------------------------------------------------------------------------------------------------
+[node25] distributed_backend=nccl
+[node25] All distributed processes registered. Starting with 1 processes
+[node25] ----------------------------------------------------------------------------------------------------
+[node25]
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] [Gloo] Rank 0 is connected to 0 peer ranks. Expected number of connected peer ranks is : 0
+[node25] NCCL version 2.28.3+cuda13.0
+[node25] Fatal Python error: Segmentation fault
+[node25]
+[node25] Current thread 0x00007fc126063300 (most recent call first):
+[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py", line 2826 in broadcast
+[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py", line 81 in wrapper
+[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py", line 3630 in broadcast_object_list
+[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py", line 81 in wrapper
+[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/strategies/ddp.py", line 307 in broadcast
+[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 1233 in log_dir
+[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 1071 in __setup_profiler
+[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 938 in _run
+[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 574 in _fit_impl
+[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105 in launch
+[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/call.py", line 46 in _call_and_handle_interrupt
+[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 538 in fit
+[node25]   File "/workspace/NeMo/nemo/collections/llm/api.py", line 136 in train
+[node25]   File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 737 in main
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/core/utils.py", line 186 in run_job
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/hydra.py", line 119 in run
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 458 in <lambda>
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 220 in run_and_report
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 457 in _run_app
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 394 in _run_hydra
+[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/main.py", line 94 in decorated_main
+[node25]   File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 751 in <module>
+[node25]
+[node25] Extension modules: yaml._yaml, numpy.core._multiarray_umath, numpy.core._multiarray_tests, numpy.linalg._umath_linalg, numpy.fft._pocketfft_internal, numpy.random._common, numpy.random.bit_generator, numpy.random._bounded_integers, numpy.random._mt19937, numpy.random.mtrand, numpy.random._philox, numpy.random._pcg64, numpy.random._sfc64, numpy.random._generator, torch._C, torch._C._dynamo.autograd_compiler, torch._C._dynamo.eval_frame, torch._C._dynamo.guards, torch._C._dynamo.utils, torch._C._fft, torch._C._linalg, torch._C._nested, torch._C._nn, torch._C._sparse, torch._C._special, scipy._lib._ccallback_c, scipy.signal._sigtools, scipy.linalg._fblas, scipy.linalg._flapack, _cyutility, scipy._cyutility, scipy.linalg.cython_lapack, scipy.linalg._cythonized_array_utils, scipy.linalg._solve_toeplitz, scipy.linalg._decomp_lu_cython, scipy.linalg._matfuncs_schur_sqrtm, scipy.linalg._matfuncs_expm, scipy.linalg._linalg_pythran, scipy.linalg.cython_blas, scipy.linalg._decomp_update, scipy.sparse._sparsetools, _csparsetools, scipy.sparse._csparsetools, scipy.special._ufuncs_cxx, scipy.special._ellip_harm_2, scipy.special._special_ufuncs, scipy.special._gufuncs, scipy.special._ufuncs, scipy.special._specfun, scipy.special._comb, scipy._lib._uarray._uarray, scipy.signal._max_len_seq_inner, scipy.signal._upfirdn_apply, scipy.signal._spline, scipy.spatial._ckdtree, scipy._lib.messagestream, scipy.spatial._qhull, scipy.spatial._voronoi, scipy.spatial._hausdorff, scipy.spatial._distance_wrap, scipy.spatial.transform._rotation, scipy.spatial.transform._rigid_transform, scipy.interpolate._fitpack, scipy.interpolate._dfitpack, scipy.sparse.linalg._dsolve._superlu, scipy.sparse.linalg._eigen.arpack._arpack, scipy.sparse.linalg._propack._spropack, scipy.sparse.linalg._propack._dpropack, scipy.sparse.linalg._propack._cpropack, scipy.sparse.linalg._propack._zpropack, scipy.optimize._group_columns, scipy.optimize._trlib._trlib, scipy.optimize._lbfgsb, _moduleTNC, scipy.optimize._moduleTNC, scipy.optimize._slsqplib, scipy.optimize._minpack, scipy.optimize._lsq.givens_elimination, scipy.optimize._zeros, scipy.linalg._decomp_interpolative, scipy.optimize._bglu_dense, scipy.optimize._lsap, scipy.optimize._direct, scipy.interpolate._dierckx, scipy.interpolate._ppoly, scipy.interpolate._interpnd, scipy.interpolate._rbfinterp_pythran, scipy.interpolate._rgi_cython, scipy.ndimage._nd_image, scipy.ndimage._rank_filter_1d, _ni_label, scipy.ndimage._ni_label, scipy.signal._sosfilt, scipy.integrate._odepack, scipy.integrate._quadpack, scipy.integrate._vode, scipy.integrate._dop, scipy.integrate._lsoda, scipy.special.cython_special, scipy.stats._stats, scipy.stats._biasedurn, scipy.stats._stats_pythran, scipy.stats._levy_stable.levyst, scipy.stats._ansari_swilk_statistics, scipy.sparse.csgraph._tools, scipy.sparse.csgraph._shortest_path, scipy.sparse.csgraph._traversal, scipy.sparse.csgraph._min_spanning_tree, scipy.sparse.csgraph._flow, scipy.sparse.csgraph._matching, scipy.sparse.csgraph._reordering, scipy.stats._sobol, scipy.stats._qmc_cy, scipy.stats._rcont.rcont, scipy.stats._qmvnt_cy, scipy.signal._peak_finding_utils, PIL._imaging, kiwisolver._cext, charset_normalizer.md, PIL._imagingft, regex._regex, markupsafe._speedups, sentencepiece._sentencepiece, zstandard.backend_c, google._upb._message, _cffi_backend, nvtx._lib.lib, nvtx._lib.profiler, Cython.Plex.Actions, Cython.Plex.Scanners, Cython.Compiler.Scanning, pyarrow.lib, pandas._libs._cyutility, pandas._libs.tslibs.ccalendar, pandas._libs.tslibs.np_datetime, pandas._libs.tslibs.dtypes, pandas._libs.tslibs.base, pandas._libs.tslibs.nattype, pandas._libs.tslibs.timezones, pandas._libs.properties, pandas._libs.tslibs.fields, pandas._libs.tslibs.timedeltas, pandas._libs.tslibs.tzconversion, pandas._libs.tslibs.timestamps, pandas._libs.tslibs.offsets, pandas._libs.tslibs.strptime, pandas._libs.tslibs.parsing, pandas._libs.tslibs.conversion, pandas._libs.tslibs.period, pandas._libs.tslibs.vectorized, pandas._libs.ops_dispatch, pandas._libs.missing, pandas._libs.hashtable, pandas._libs.algos, pandas._libs.interval, pandas._libs.lib, pyarrow._compute, pandas._libs.ops, numexpr.interpreter, pandas._libs.hashing, pandas._libs.arrays, pandas._libs.tslib, pandas._libs.sparse, pandas._libs.internals, pandas._libs.indexing, pandas._libs.index, pandas._libs.writers, pandas._libs.join, pandas._libs.window.aggregations, pandas._libs.window.indexers, pandas._libs.reshape, pandas._libs.groupby, pandas._libs.json, pandas._libs.parsers, pandas._libs.testing, psutil._psutil_linux, psutil._psutil_posix, numcodecs.compat_ext, numcodecs.blosc, numcodecs.zstd, numcodecs.lz4, numcodecs._shuffle, msgpack._cmsgpack, numcodecs.jenkins, numcodecs.vlen, numcodecs.fletcher32, sklearn.__check_build._check_build, sklearn._cyutility, sklearn.utils._isfinite, sklearn.utils.sparsefuncs_fast, sklearn.utils.murmurhash, sklearn.utils._openmp_helpers, sklearn.metrics.cluster._expected_mutual_info_fast, sklearn.preprocessing._csr_polynomial_expansion, sklearn.preprocessing._target_encoder_fast, sklearn.metrics._dist_metrics, sklearn.metrics._pairwise_distances_reduction._datasets_pair, sklearn.utils._cython_blas, sklearn.metrics._pairwise_distances_reduction._base, sklearn.metrics._pairwise_distances_reduction._middle_term_computer, sklearn.utils._heap, sklearn.utils._sorting, sklearn.metrics._pairwise_distances_reduction._argkmin, sklearn.metrics._pairwise_distances_reduction._argkmin_classmode, sklearn.utils._vector_sentinel, sklearn.metrics._pairwise_distances_reduction._radius_neighbors, sklearn.metrics._pairwise_distances_reduction._radius_neighbors_classmode, sklearn.metrics._pairwise_fast, h5py._errors, h5py.defs, h5py._objects, h5py.h5, h5py.utils, h5py.h5t, h5py.h5s, h5py.h5ac, h5py.h5p, h5py.h5r, h5py._proxy, h5py._conv, h5py.h5z, h5py.h5a, h5py.h5d, h5py.h5ds, h5py.h5g, h5py.h5i, h5py.h5o, h5py.h5f, h5py.h5fd, h5py.h5pl, h5py.h5l, h5py._selector, pyarrow._acero, pyarrow._fs, pyarrow._csv, pyarrow._json, pyarrow._substrait, pyarrow._dataset, pyarrow._dataset_orc, pyarrow._parquet, pyarrow._azurefs, pyarrow._hdfs, pyarrow._gcsfs, pyarrow._s3fs, pyarrow._parquet_encryption, pyarrow._dataset_parquet_encryption, pyarrow._dataset_parquet, multidict._multidict, yarl._quoting_c, propcache._helpers_c, aiohttp._http_writer, aiohttp._http_parser, aiohttp._websocket.mask, aiohttp._websocket.reader_c, frozenlist._frozenlist, xxhash._xxhash, zmq.backend.cython._zmq (total: 257)
+[node25] E0826 19:29:02.788000 1 torch/distributed/elastic/multiprocessing/api.py:880] failed (exitcode: -11) local_rank: 0 (pid: 298) of binary: /usr/bin/python
 [node25] Traceback (most recent call last):
-[node25]   File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 751, in <module>
-[node25]     main()
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/main.py", line 94, in decorated_main
-[node25]     _run_hydra(
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 394, in _run_hydra
-[node25]     _run_app(
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 457, in _run_app
-[node25]     run_and_report(
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 223, in run_and_report
-[node25]     raise ex
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 220, in run_and_report
-[node25]     return func()
-[node25]            ^^^^^^
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/utils.py", line 458, in <lambda>
-[node25]     lambda: hydra.run(
-[node25]             ^^^^^^^^^^
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/_internal/hydra.py", line 132, in run
-[node25]     _ = ret.return_value
-[node25]         ^^^^^^^^^^^^^^^^
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/core/utils.py", line 260, in return_value
-[node25]     raise self._return_value
-[node25]   File "/usr/local/lib/python3.12/dist-packages/hydra/core/utils.py", line 186, in run_job
-[node25]     ret.return_value = task_function(task_cfg)
-[node25]                        ^^^^^^^^^^^^^^^^^^^^^^^
-[node25]   File "/mgmt/server/poc-platform/training_results_v5.1-main/NVIDIA/benchmarks/llama31_8b/implementations/nemo/pretrain.py", line 737, in main
-[node25]     train(
-[node25]   File "/workspace/NeMo/nemo/collections/llm/api.py", line 136, in train
-[node25]     trainer.fit(model, data)
-[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 538, in fit
-[node25]     call._call_and_handle_interrupt(
-[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/call.py", line 46, in _call_and_handle_interrupt
-[node25]     return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
-[node25]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105, in launch
-[node25]     return function(*args, **kwargs)
-[node25]            ^^^^^^^^^^^^^^^^^^^^^^^^^
-[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 574, in _fit_impl
-[node25]     self._run(model, ckpt_path=ckpt_path)
-[node25]   File "/usr/local/lib/python3.12/dist-packages/lightning/pytorch/trainer/trainer.py", line 926, in _run
-[node25]     self.strategy.connect(model)
-[node25]   File "/workspace/NeMo/nemo/lightning/pytorch/strategies/megatron_strategy.py", line 446, in connect
-[node25]     _maybe_mcore_config = _strategy_lib.set_model_parallel_attributes(model, self.parallelism)
-[node25]                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-[node25]   File "/workspace/NeMo/nemo/lightning/_strategy_lib.py", line 175, in set_model_parallel_attributes
-[node25]     config.__post_init__()
-[node25]   File "/workspace/Megatron-LM/megatron/core/transformer/transformer_config.py", line 716, in __post_init__
-[node25]     super().__post_init__()
-[node25]   File "/workspace/Megatron-LM/megatron/core/model_parallel_config.py", line 359, in __post_init__
-[node25]     raise ValueError("Can not use sequence paralllelism without tensor parallelism")
-[node25] ValueError: Can not use sequence paralllelism without tensor parallelism
-[node25] E0826 19:17:24.169000 1 torch/distributed/elastic/multiprocessing/api.py:880] failed (exitcode: 1) local_rank: 0 (pid: 298) of binary: /usr/bin/python
+[node25]   File "/usr/local/bin/torchrun", line 7, in <module>
+[node25]     sys.exit(main())
+[node25]              ^^^^^^
+[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 357, in wrapper
+[node25]     return f(*args, **kwargs)
+[node25]            ^^^^^^^^^^^^^^^^^^
+[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 936, in main
+[node25]     run(args)
+[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 927, in run
+[node25]     elastic_launch(
+[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 151, in __call__
+[node25]     return launch_agent(self._config, self._entrypoint, list(args))
+[node25]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[node25]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 288, in launch_agent
+[node25]     raise ChildFailedError(
+[node25] torch.distributed.elastic.multiprocessing.errors.ChildFailedError:
