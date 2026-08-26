@@ -130,6 +130,16 @@ journalctl -u poc-platform-dev.service -f    # 또는 tail -f .poc_platform.log
 `HISTORY.md` 참고. `.poc_platform_dev_state/`가 아직 없다면 `.poc_platform_state/`를 복사해서
 시드 데이터로 써도 됩니다: `rsync -a .poc_platform_state/ .poc_platform_dev_state/`.)
 
+## 노드 세팅
+
+GPU 노드 점검은 스크립트로 합니다.
+
+```bash
+./scripts/node_check.sh --host <노드 IP>    # GPU 노드 (드라이버/런타임/NVSwitch/IB)
+./scripts/preflight.sh                      # 관리 서버 (데이터 루트/이미지 tar)
+./scripts/nccl_probe.sh --host <노드 IP> --image <repo:tag>   # NCCL만 30초 검증
+```
+
 ## 주요 구성
 
 ```text
