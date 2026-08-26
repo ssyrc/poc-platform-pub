@@ -1,91 +1,28 @@
-[root@node-26049 poc-platform-pub]# NCCL_DEBUG=INFO UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
-./scripts/nccl_probe.sh --host $NODE --image $IMG --gpus 1
-[INFO] host=node25 image=registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell gpus=1
-[INFO] env into container: NCCL_DEBUG=INFO NCCL_IB_DISABLE= NCCL_IB_HCA= NCCL_SOCKET_IFNAME= UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1
-Warning: Permanently added 'node25' (ED25519) to the list of known hosts.
-[REMOTE] nproc_per_node=1
-+ docker run --rm --gpus all --network=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 --device /dev/infiniband/issm4 --device /dev/infiniband/issm5 --device /dev/infiniband/issm6 --device /dev/infiniband/issm7 --device /dev/infiniband/rdma_cm --device /dev/infiniband/umad0 --device /dev/infiniband/umad1 --device /dev/infiniband/umad10 --device /dev/infiniband/umad11 --device /dev/infiniband/umad12 --device /dev/infiniband/umad13 --device /dev/infiniband/umad14 --device /dev/infiniband/umad15 --device /dev/infiniband/umad2 --device /dev/infiniband/umad3 --device /dev/infiniband/umad4 --device /dev/infiniband/umad5 --device /dev/infiniband/umad6 --device /dev/infiniband/umad7 --device /dev/infiniband/umad8 --device /dev/infiniband/umad9 --device /dev/infiniband/uverbs0 --device /dev/infiniband/uverbs1 --device /dev/infiniband/uverbs10 --device /dev/infiniband/uverbs11 --device /dev/infiniband/uverbs12 --device /dev/infiniband/uverbs13 --device /dev/infiniband/uverbs14 --device /dev/infiniband/uverbs15 --device /dev/infiniband/uverbs2 --device /dev/infiniband/uverbs3 --device /dev/infiniband/uverbs4 --device /dev/infiniband/uverbs5 --device /dev/infiniband/uverbs6 --device /dev/infiniband/uverbs7 --device /dev/infiniband/uverbs8 --device /dev/infiniband/uverbs9 -v /tmp/tmp.ES4pI52LbN:/probe:ro -e NCCL_DEBUG=INFO -e NCCL_IB_DISABLE= -e NCCL_IB_HCA= -e NCCL_SOCKET_IFNAME= -e UCX_HANDLE_ERRORS=none -e UCX_ERROR_SIGNALS= -e PYTHONFAULTHANDLER=1 registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell torchrun --standalone --nproc_per_node=1 /probe/nccl_probe.py
+### multinode 에러
+NCCL_NET_PLUGIN=none NCCL_DEBUG=INFO \
+UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
+./scripts/nccl_probe.sh --hosts $N1,$N2 --image $IMG
 
-=============
-== PyTorch ==
-=============
-
-NVIDIA Release 25.09 (build 210907837)
-PyTorch Version 2.9.0a0+50eac81
-Container image Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-Copyright (c) 2014-2024 Facebook Inc.
-Copyright (c) 2011-2014 Idiap Research Institute (Ronan Collobert)
-Copyright (c) 2012-2014 Deepmind Technologies    (Koray Kavukcuoglu)
-Copyright (c) 2011-2012 NEC Laboratories America (Koray Kavukcuoglu)
-Copyright (c) 2011-2013 NYU                      (Clement Farabet)
-Copyright (c) 2006-2010 NEC Laboratories America (Ronan Collobert, Leon Bottou, Iain Melvin, Jason Weston)
-Copyright (c) 2006      Idiap Research Institute (Samy Bengio)
-Copyright (c) 2001-2004 Idiap Research Institute (Ronan Collobert, Samy Bengio, Johnny Mariethoz)
-Copyright (c) 2015      Google Inc.
-Copyright (c) 2015      Yangqing Jia
-Copyright (c) 2013-2016 The Caffe contributors
-All rights reserved.
-
-Various files include modifications (c) NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
-
-GOVERNING TERMS: The software and materials are governed by the NVIDIA Software License Agreement
-(found at https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement/)
-and the Product-Specific Terms for NVIDIA AI Products
-(found at https://www.nvidia.com/en-us/agreements/enterprise-software/product-specific-terms-for-ai-products/).
-
-NOTE: Mellanox network driver detected, but NVIDIA peer memory driver not
-      detected.  Multi-node communication performance may be reduced.
-
-/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:63: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
-  import pynvml  # type: ignore[import]
-/usr/local/lib/python3.12/dist-packages/torch/cuda/__init__.py:63: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
-  import pynvml  # type: ignore[import]
-[probe r0] torch 2.9.0a0+50eac811a6.nv25.09  cuda 13.0  nccl 2.27.7
-[probe r0] cuda:0 NVIDIA B300 SXM6 AC sm_103
-[probe r0] init_process_group(nccl) ...
-[probe r0] init_process_group OK
-[probe r0] all_reduce ...
-node-26049:293:293 [0] NCCL INFO Bootstrap: Using bond0.3061:node25<0>
-node-26049:293:293 [0] NCCL INFO cudaDriverVersion 13000
-node-26049:293:293 [0] NCCL INFO NCCL version 2.28.3+cuda13.0
-node-26049:293:293 [0] NCCL INFO Comm config Blocking set to 1
-node-26049:293:293 [0] NCCL INFO NET/Plugin: Loaded net plugin NCCL RDMA Plugin v10 (v10)
-node-26049:293:293 [0] NCCL INFO NET/Plugin: Loaded collnet plugin SHARP (v10)
-node-26049:293:293 [0] NCCL INFO Successfully loaded external network plugin /opt/hpcx/nccl_rdma_sharp_plugin/lib/libnccl-net.so
-node-26049:293:293 [0] NCCL INFO Plugin Path : /opt/hpcx/nccl_rdma_sharp_plugin/lib/libnccl-net.so
-node-26049:293:293 [0] NCCL INFO P2P plugin v10 IBext_v10
-node-26049:293:293 [0] NCCL INFO NET/IB : Using [0]mlx5_0:1/IB/SHARP [1]mlx5_1:1/IB/SHARP [2]mlx5_2:1/RoCE [3]mlx5_3:1/RoCE [4]mlx5_4:1/IB/SHARP [5]mlx5_5:1/IB/SHARP [6]mlx5_6:1/IB/SHARP [7]mlx5_7:1/IB/SHARP [8]mlx5_8:1/IB/SHARP [9]mlx5_9:1/IB/SHARP [10]mlx5_10:1/IB/SHARP [11]mlx5_11:1/IB/SHARP [12]mlx5_12:1/RoCE [13]mlx5_13:1/RoCE [14]mlx5_14:1/IB/SHARP [15]mlx5_15:1/IB/SHARP [RO]; OOB bond0.3061:node25<0>
-node-26049:293:293 [0] NCCL INFO Initialized NET plugin NCCL RDMA Plugin v10
-node-26049:293:293 [0] NCCL INFO Assigned NET plugin NCCL RDMA Plugin v10 to comm
-node-26049:293:293 [0] NCCL INFO Using network NCCL RDMA Plugin v10
-node-26049:293:293 [0] NCCL INFO DMA-BUF is available on GPU device 0
-node-26049:293:293 [0] NCCL INFO ncclCommInitRankConfig comm 0xa39de20 rank 0 nranks 1 cudaDev 0 nvmlDev 0 busId 1a000 commId 0x371bdb1f311d8ec3 - Init START
-node-26049:293:293 [0] NCCL INFO RAS client listening socket at ::1<28028>
-node-26049:293:293 [0] NCCL INFO Bootstrap timings total 0.000593 (create 0.000034, send 0.000103, recv 0.000142, ring 0.000002, delay 0.000001)
-node-26049:293:293 [0] NCCL INFO MNNVL busId 0x1a000 fabric UUID 0.0 cliqueId 0x0 state 3 healthMask 0x80
-Fatal Python error: Segmentation fault
-
-Current thread 0x00007fc1b72dc300 (most recent call first):
-  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py", line 2926 in all_reduce
-  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/c10d_logger.py", line 81 in wrapper
-  File "/probe/nccl_probe.py", line 47 in <module>
-
-Extension modules: numpy.core._multiarray_umath, numpy.core._multiarray_tests, numpy.linalg._umath_linalg, numpy.fft._pocketfft_internal, numpy.random._common, numpy.random.bit_generator, numpy.random._bounded_integers, numpy.random._mt19937, numpy.random.mtrand, numpy.random._philox, numpy.random._pcg64, numpy.random._sfc64, numpy.random._generator, torch._C, torch._C._dynamo.autograd_compiler, torch._C._dynamo.eval_frame, torch._C._dynamo.guards, torch._C._dynamo.utils, torch._C._fft, torch._C._linalg, torch._C._nested, torch._C._nn, torch._C._sparse, torch._C._special (total: 24)
-E0826 19:34:00.430000 1 torch/distributed/elastic/multiprocessing/api.py:880] failed (exitcode: -11) local_rank: 0 (pid: 293) of binary: /usr/bin/python
-Traceback (most recent call last):
-  File "/usr/local/bin/torchrun", line 7, in <module>
-    sys.exit(main())
-             ^^^^^^
-  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 357, in wrapper
-    return f(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 936, in main
-    run(args)
-  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 927, in run
-    elastic_launch(
-  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 151, in __call__
-    return launch_agent(self._config, self._entrypoint, list(args))
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 288, in launch_agent
-    raise ChildFailedError(
-torch.distributed.elastic.multiprocessing.errors.ChildFailedError:
+# 에러 메시지
+[node19] node-26043:295:480 [2] NCCL INFO misc/socket.cc:920 -> 3
+[node19] [probe r2] all_reduce WRONG RESULT: 0.0 != 16
+[node19] node-26043:293:337 [0] NCCL INFO comm 0xa33e4a0 rank 0 nranks 16 cudaDev 0 busId 1a000 - Abort COMPLETE
+[node19] [rank0]:[E826 20:17:48.968328114 ProcessGroupNCCL.cpp:746] [Rank 0] Some NCCL operations have failed or timed out. Due to the asynchronous nature of CUDA kernels, subsequent GPU operations might run on corrupted/incomplete data.
+[node19] [rank0]:[E826 20:17:48.968340593 ProcessGroupNCCL.cpp:760] [Rank 0] To avoid data inconsistency, we are taking the entire process down.
+[node19] [rank0]:[E826 20:17:48.968380766 ProcessGroupNCCL.cpp:2067] [PG ID 0 PG GUID 0(default_pg) Rank 0] Process group watchdog thread terminated with exception: NCCL error: remote process exited or there was a network error, NCCL version 2.28.3
+[node19] ncclRemoteError: A call failed possibly due to a network error or a remote process exiting prematurely.
+[node19] Last error:
+[node19] NET/IB: Got completion from peer node20<57713> with status=4 opcode=0 len=0 vendor err 81 (Send) hca mlx5_0
+[node19] Exception raised from checkForNCCLErrorsInternal at /opt/pytorch/pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:2717 (most recent call first):
+[node19] frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x88 (0x7f33b3263d98 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+[node19] frame #1: <unknown function> + 0xc64bee (0x7f33b3fd4bee in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+[node19] frame #2: c10d::ProcessGroupNCCL::checkForNCCLErrorsInternal(std::shared_ptr<c10d::NCCLComm>&) + 0x342 (0x7f33b3ff30c2 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+[node19] frame #3: c10d::ProcessGroupNCCL::WorkNCCL::checkAndSetException() + 0x76 (0x7f33b3ff6e76 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+[node19] frame #4: c10d::ProcessGroupNCCL::Watchdog::runLoop() + 0xa58 (0x7f33b3ffa748 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+[node19] frame #5: c10d::ProcessGroupNCCL::Watchdog::run() + 0x104 (0x7f33b3ffc764 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+[node19] frame #6: <unknown function> + 0xecdb4 (0x7f33b297bdb4 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+[node19] frame #7: <unknown function> + 0x9caa4 (0x7f33eaafeaa4 in /lib/x86_64-linux-gnu/libc.so.6)
+[node19] frame #8: __clone + 0x44 (0x7f33eab8ba34 in /lib/x86_64-linux-gnu/libc.so.6)
+[node19]
+[node19] terminate called after throwing an instance of 'c10::DistBackendError'
+[node19]   what():  [PG ID 0 PG GUID 0(default_pg) Rank 0] Process group watchdog thread terminated with exception: NCCL error: remote process exited or there was a network error, NCCL version 2.28.3
