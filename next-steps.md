@@ -3,41 +3,40 @@
 `Errors`에 올라온 최신 증상에 대해 **지금 실행할 커맨드**만 모아둔 파일입니다.
 `Errors`가 갱신되면 이 파일도 갱신됩니다.
 
-- 갱신: 2026-08-26 (3회차)
-- 대상 증상: training v5.1 단일노드 실행 중 segfault (B300)
+- 갱신: 2026-08-26 (4회차)
+- 대상 증상: training v5.1 단일노드 SIGSEGV (B300)
 
 ---
 
-## 이번 회차의 핵심 발견 — UCX는 범인이 아닙니다
+## 이번 회차의 핵심 발견
 
-백트레이스가 4프레임뿐이고 **애플리케이션 프레임이 하나도 없습니다.**
+### 1. 이미지에 `sm_103`이 없습니다
 
 ```
-0 libucs.so.0(ucs_handle_error+0x2e4)   ← UCX 시그널 핸들러 진입
-1 libucs.so.0(+0x3796a)                 ← 핸들러 내부
-2 libucs.so.0(+0x37ba8)                 ← 핸들러 내부
-3 libc.so.6(+0x45330)                   ← 시그널 트램폴린
+['sm_75', 'sm_80', 'sm_86', 'sm_90', 'sm_100', 'sm_120', 'compute_120']
 ```
 
-UCX는 NGC 컨테이너에서 **프로세스 전역 SIGSEGV 핸들러**를 설치합니다.
-따라서 어디서 죽든 이 백트레이스가 찍힙니다. 이건 크래시 **지점**이 아니라 **보고자**입니다.
+**B300(Blackwell Ultra)은 compute capability 10.3 = `sm_103`입니다.**
+목록에 `sm_100`과 `sm_120`은 있는데 **`sm_103`은 없습니다.**
 
-`UCX_TLS` 우회가 안 통한 이유도 이것입니다 — transport를 제한해도 핸들러는 그대로이고,
-크래시는 애초에 UCX transport 코드에서 나는 게 아니었습니다.
+`compute_120` PTX가 있지만 JIT은 위로만 가능해서 12.0 PTX가 10.3으로 내려오지 못합니다.
+즉 이 이미지에는 B300용 네이티브 커널도, 폴백 경로도 없을 가능성이 큽니다.
 
-### 지금까지 탈락한 가설
+그리고 `NVTE_CUDA_ARCHS=`가 **비어 있습니다.** 발행자 문서는 `-sm90` 태그가
+`89;90;100a;103a`로 빌드됐다고 했는데, 컨테이너에서 확인이 안 됩니다.
 
-| 가설 | 결과 |
-|---|---|
-| 호스트 IB 이상 | IB NIC 전부 ACTIVE / link up |
-| `nvidia_peermem` 미로드 | **이미 로드돼 있음** (컨테이너 배너의 "not detected"는 오탐) |
-| 컨테이너가 IB를 못 잡음 | `mlx5_0`~`mlx5_15` + `cuda_cpy` + `cuda_ipc` 전부 정상 인식 |
-| UCX transport 문제 | `UCX_TLS` 제한해도 동일 — UCX는 신호 보고자일 뿐 |
-| 런처 코드 변경 | 원본 zip 대비 실행 경로 변경 없음 |
+### 2. 항상 **rank 6**에서 죽습니다
 
-**남은 유력 후보: B300(sm_103)에 대한 컨테이너의 커널 커버리지.**
-현재 쓰는 `-sm90` 태그가 `NVTE_CUDA_ARCHS="89;90;100a;103a"`를 담고 있다는 건
-**발행자 문서상의 주장이고, 실제 이미지에서 확인한 적이 없습니다.**
+```
+failed (exitcode: -11) local_rank: 6 (pid: 320) of binary: /usr/bin/python
+traceback : Signal 11 (SIGSEGV) received by PID 320
+```
+
+나머지 랭크는 SIGTERM으로 정리된 것뿐이고, **실제로 죽은 건 rank 6 하나**입니다.
+1회차 로그에서도 pid 320이었습니다 — **두 번 다 같은 랭크**입니다.
+
+특정 랭크에서만 반복해서 죽는 건 아키텍처 미지원보다 **특정 GPU 문제**에 가까운 패턴입니다.
+두 가설이 공존하므로 아래 STEP 1·2로 갈라냅니다.
 
 ---
 
@@ -45,7 +44,7 @@ UCX는 NGC 컨테이너에서 **프로세스 전역 SIGSEGV 핸들러**를 설�
 
 ```bash
 cd /mgmt/server/poc-platform/poc-platform-pub
-git pull                      # 디버그 변수 전달 기능 (커밋 65bc30d)
+git pull                      # PYTHONFAULTHANDLER 전달 (커밋 e72de4d)
 
 NODE=<대상 노드 IP>
 IMAGE=donnmyth/mlperf-nvidia:llama2_70b_lora-pyt-sm90
@@ -53,104 +52,113 @@ IMAGE=donnmyth/mlperf-nvidia:llama2_70b_lora-pyt-sm90
 
 ---
 
-## STEP 1 — 진짜 백트레이스 확보  ← 최우선
+## STEP 1 — GPU의 실제 compute capability 확인  ← 1순위, 1줄
 
-UCX 핸들러를 끄면 Python traceback이나 실제 C++ 스택이 나옵니다.
-**이 변수들은 방금 전달 가능해졌습니다** (그 전에는 컨테이너까지 안 갔습니다).
-
-```bash
-UCX_HANDLE_ERRORS=none \
-UCX_ERROR_SIGNALS= \
-TORCH_SHOW_CPP_STACKTRACES=1 \
-./scripts/run_single_node.sh --host $NODE --tp 8 --pp 1 --mbs 1 --gbs 128 --max-steps 10
-```
-
-전달 확인: 로그의 `[INFO] advanced env forwarded:` 줄에 `UCX_HANDLE_ERRORS`가 보여야 합니다.
-
-**여기서 나오는 스택 전체를 `Errors`에 붙여주세요.** 이게 이번 회차에서 가장 중요합니다.
-
-CUDA 커널에서 죽는 것으로 보이면 launch 지점까지 좁힙니다 (느려지지만 정확해집니다).
+`sm_103` 가설을 확정하거나 폐기합니다.
 
 ```bash
-UCX_HANDLE_ERRORS=none CUDA_LAUNCH_BLOCKING=1 TORCH_SHOW_CPP_STACKTRACES=1 \
-./scripts/run_single_node.sh --host $NODE --tp 8 --pp 1 --mbs 1 --gbs 128 --max-steps 10
+ssh $NODE 'nvidia-smi --query-gpu=index,name,compute_cap --format=csv'
 ```
+
+| 결과 | 의미 |
+|---|---|
+| `10.3` | 이미지의 `sm_103` 부재가 유력한 원인 → STEP 3 |
+| `10.0` | 이미지에 `sm_100`이 있으므로 아키텍처는 무관 → STEP 2 |
 
 ---
 
-## STEP 2 — 이미지가 B300(sm_103)을 실제로 지원하는지
+## STEP 2 — rank 6 / GPU 6 격리  ← 1순위, 결정적
 
-계속 미뤄온 확인입니다. 이제 직접 관련이 있습니다.
+GPU 6을 빼고 4장으로만 돌립니다. 통과하면 원인이 특정 GPU로 좁혀집니다.
 
 ```bash
-ssh $NODE "docker run --rm --gpus all $IMAGE bash -c '
-echo \"NVTE_CUDA_ARCHS=\$NVTE_CUDA_ARCHS\"
-nvcc --version | tail -2
-python -c \"import torch; print(torch.__version__, torch.version.cuda); print(torch.cuda.get_arch_list())\"
-'"
+UCX_HANDLE_ERRORS=none PYTHONFAULTHANDLER=1 TORCH_SHOW_CPP_STACKTRACES=1 \
+./scripts/run_single_node.sh --host $NODE --gpus 4 --tp 4 --pp 1 --mbs 1 --gbs 64 --max-steps 10
 ```
 
-**판정**
-
-| `get_arch_list()` 결과 | 의미 |
+| 결과 | 의미 |
 |---|---|
-| `sm_100` / `sm_103` 포함 | 이미지는 B300 지원. 원인은 다른 곳 → STEP 1 스택으로 판단 |
-| `sm_90`까지만 | **이미지가 B300 미지원.** `-sm90` 태그가 문서상 주장과 다름 → STEP 3 |
+| **통과** | GPU 4~7 중 문제 있음 → 아래로 범위 좁히기 |
+| rank 2 등 **다른 랭크**에서 죽음 | 특정 GPU 문제 아님 → 아키텍처 쪽 (STEP 3) |
+| 여전히 죽음 | GPU 0~3에도 재현 → 아키텍처 쪽 (STEP 3) |
 
-TransformerEngine 쪽도 함께 봅니다 (실제 커널이 있는지).
+통과했다면 반대쪽 4장으로 확인합니다.
 
 ```bash
-ssh $NODE "docker run --rm --gpus all $IMAGE bash -c '
-so=\$(find / -name \"*.so\" -path \"*transformer_engine*\" 2>/dev/null | head -1)
-echo \"== \$so\"
-cuobjdump --list-elf \"\$so\" 2>/dev/null | grep -oE \"sm_[0-9]+\" | sort -u | tr \"\\n\" \" \"
-'"
+MLPERF_CUDA_VISIBLE_DEVICES=4,5,6,7 \
+UCX_HANDLE_ERRORS=none PYTHONFAULTHANDLER=1 \
+./scripts/run_single_node.sh --host $NODE --gpus 4 --tp 4 --pp 1 --mbs 1 --gbs 64 --max-steps 10
 ```
+
+GPU 6 상태도 함께 봅니다.
+
+```bash
+ssh $NODE 'nvidia-smi -i 6 -q | grep -iE "ecc|retired|remapp|pending|xid"'
+ssh $NODE 'dmesg | grep -iE "xid|nvrm" | tail -20'
+```
+
+**Xid 에러가 보이면 하드웨어/드라이버 문제로 확정**입니다.
 
 ---
 
 ## STEP 3 — Blackwell 전용 태그로 A/B
 
-STEP 2에서 `sm_100`/`sm_103`이 안 보이면 이 이미지로 바꿔서 같은 실행을 합니다.
+STEP 1이 `10.3`이거나 STEP 2에서 특정 GPU가 아니라고 나오면 이미지를 바꿔 봅니다.
 
 ```bash
-UCX_HANDLE_ERRORS=none TORCH_SHOW_CPP_STACKTRACES=1 \
+UCX_HANDLE_ERRORS=none PYTHONFAULTHANDLER=1 TORCH_SHOW_CPP_STACKTRACES=1 \
 ./scripts/run_single_node.sh --host $NODE \
   --docker-image donnmyth/mlperf-nvidia:llama2_70b_lora-pyt \
   --tp 8 --pp 1 --mbs 1 --gbs 128 --max-steps 10
 ```
 
-접미사 없는 `llama2_70b_lora-pyt`가 발행자 표에서 "upstream default (sm_100/103)"으로
-표시된 Blackwell 전용 이미지입니다.
+먼저 그 이미지의 커버리지부터 봐도 좋습니다.
 
-이걸로 통과하면 **B300은 이 태그를 써야 한다**가 확정되고, 런처 기본값을 그렇게 바꾸겠습니다.
-(예전에 이 방향으로 바꿨다가 `-sm90`이 더 넓다는 문서 근거로 되돌린 이력이 있습니다 —
-실측이 문서를 이깁니다.)
+```bash
+ssh $NODE "docker run --rm --gpus all donnmyth/mlperf-nvidia:llama2_70b_lora-pyt \
+  python -c 'import torch; print(torch.cuda.get_arch_list())'"
+```
+
+여기에 `sm_103`이 있고 실행도 통과하면 **B300은 이 태그를 써야 한다**가 확정됩니다.
+그러면 런처 기본값을 그렇게 바꾸겠습니다. 실측이 발행자 문서를 이깁니다.
 
 ---
 
-## STEP 4 — 결과 회신
+## STEP 4 — TransformerEngine 커널 실측 (보조)
+
+PyTorch가 아니라 TE 쪽에 sm_103이 있는지 봅니다.
+
+```bash
+ssh $NODE "docker run --rm --gpus all $IMAGE bash -c '
+so=\$(find / -name \"*.so\" -path \"*transformer_engine*\" 2>/dev/null | head -1)
+echo \"== \$so\"
+cuobjdump --list-elf \"\$so\" 2>/dev/null | grep -oE \"sm_[0-9]+\" | sort -u | tr \"\\n\" \" \"'"
+```
+
+---
+
+## STEP 5 — 결과 회신
 
 `Errors`에 다음을 붙여주세요.
 
-1. **STEP 1의 전체 스택** (가장 중요)
-2. STEP 2의 `NVTE_CUDA_ARCHS`, `get_arch_list()`, TE의 `sm_*` 목록
-3. STEP 3을 했다면 그 결과 — 통과했는지, 다른 지점에서 죽는지
+1. **STEP 1의 `compute_cap`** (한 줄이지만 가장 결정적)
+2. **STEP 2의 결과** — 통과 여부, 죽었다면 어느 rank인지
+3. `nvidia-smi -i 6 -q`의 ECC/retired/remapped, `dmesg`의 Xid
+4. STEP 3을 했다면 그 arch list와 실행 결과
 
 ---
 
 ## 이미 확인된 것 (다시 볼 필요 없음)
 
-**런처는 원본 그대로입니다.** `mlperf_run.sh`, `common.sh`는 원본 zip과 바이트 단위로 동일하고,
-`mlperf_train_v51.sh`에 추가된 것은 docker tar 폴백과 env 전달 목록뿐입니다.
-
-**컨테이너 실행 인자도 정상입니다.** `--ipc=host`, `--ulimit memlock=-1`,
-`--ulimit stack=67108864`, `--network=host`, `--gpus all`, `/dev/infiniband/*` 패스스루를
-모두 넘기고 있습니다. 지난 로그들의 SHMEM 경고는 진단용으로 직접 띄운 맨 `docker run`에서
-나온 것이라 실제 실행과 무관합니다.
-
-**컨테이너 배너의 "NVIDIA peer memory driver not detected"는 오탐입니다.**
-호스트에서 `lsmod`로 `nvidia_peermem` 로드 확인했습니다.
+| 항목 | 결과 |
+|---|---|
+| 호스트 IB | NIC 전부 ACTIVE / link up |
+| `nvidia_peermem` | 로드됨 (컨테이너 배너의 "not detected"는 오탐) |
+| 컨테이너 UCX | `mlx5_0`~`mlx5_15`, `cuda_cpy`, `cuda_ipc` 전부 정상 인식 |
+| UCX transport | 원인 아님. 4프레임 백트레이스는 UCX의 전역 시그널 핸들러였음 |
+| 런처 코드 | `mlperf_run.sh` / `common.sh` 원본과 동일. v5.1은 tar 폴백과 env 목록만 추가 |
+| 컨테이너 인자 | `--ipc=host`, `--ulimit memlock=-1`, `--network=host`, IB 패스스루 모두 정상 |
+| 이미지 CUDA | 13.0, PyTorch 2.9.0a0 (NGC 25.09) |
 
 ---
 
