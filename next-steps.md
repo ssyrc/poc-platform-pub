@@ -71,7 +71,7 @@ fi
 
 ## 준비
 
-**`git pull` 필요** (`아래 커밋` — B300 기본값 반영).
+**`git pull` 필요** (`489dc11` — B300 기본값 반영).
 
 ```bash
 cd /mgmt/server/poc-platform/poc-platform-pub
@@ -164,7 +164,7 @@ UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
 | `76a7fc8` | `--docker-image`에 맞는 tar를 `MLPERF_TRAIN_IMAGE_TAR`로 지정 가능 |
 | `a3d213a` | `scripts/nccl_probe.sh` — NCCL만 30초에 판정하는 프로브 |
 | `cd1e79e`, `43b7edb`, `fcab584` | NCCL/UCX 디버그 변수 forward |
-| (이번) | B300에서 `NCCL_NET_PLUGIN=none` 기본 적용 |
+| `489dc11` | B300에서 `NCCL_NET_PLUGIN=none` 기본 적용 |
 
 ---
 
