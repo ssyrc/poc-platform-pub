@@ -26,3 +26,51 @@ UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
 [node19]
 [node19] terminate called after throwing an instance of 'c10::DistBackendError'
 [node19]   what():  [PG ID 0 PG GUID 0(default_pg) Rank 0] Process group watchdog thread terminated with exception: NCCL error: remote process exited or there was a network error, NCCL version 2.28.3
+
+
+
+### IB 끄고, TCP socket으로 멀티노드 NCCL 되나 확인
+NCCL_NET_PLUGIN=none \
+NCCL_IB_DISABLE=1 \
+NCCL_DEBUG=INFO \
+UCX_HANDLE_ERRORS=none \
+UCX_ERROR_SIGNALS= \
+PYTHONFAULTHANDLER=1 \
+./scripts/nccl_probe.sh --hosts $N1,$N2 --image $IMG
+
+### 에러 메시지
+[node19] node-26043:299:495 [6] NCCL INFO proxy.cc:972 -> 6 [Progress Thread]
+[node20]
+[node20] [2026-08-26 20:26:43] node-26044:295:493 [4] transport/net_ib.cc:2470 NCCL WARN NET/IB: Got completion from peer node19<38587> with status=4 opcode=0 len=0 vendor err 81 (Send) hca mlx5_10
+[node20] node-26044:295:493 [4] NCCL INFO transport/net.cc:1339 -> 6
+[node20] node-26044:295:493 [4] NCCL INFO proxy.cc:972 -> 6 [Progress Thread]
+[node20]
+[node20] [2026-08-26 20:26:43] node-26044:292:495 [1] transport/net_ib.cc:2470 NCCL WARN NET/IB: Got completion from peer node19<46101> with status=4 opcode=0 len=0 vendor err 81 (Send) hca mlx5_1
+[node20] node-26044:292:495 [1] NCCL INFO transport/net.cc:1339 -> 6
+[node20]
+[node20] [2026-08-26 20:26:43] node-26044:292:495 [1] transport/net_ib.cc:2470 NCCL WARN NET/IB: Got completion from peer node19<38935> with status=4 opcode=0 len=0 vendor err 81 (Send) hca mlx5_1
+[node20] node-26044:292:495 [1] NCCL INFO transport/net.cc:1339 -> 6
+[node20] node-26044:292:495 [1] NCCL INFO proxy.cc:972 -> 6 [Progress Thread]
+[node19]
+[node19] [2026-08-26 20:26:43] node-26043:294:494 [1] transport/net_ib.cc:2470 NCCL WARN NET/IB: Got completion from peer node20<36665> with status=4 opcode=0 len=0 vendor err 81 (Send) hca mlx5_1
+[node19] node-26043:294:494 [1] NCCL INFO transport/net.cc:1339 -> 6
+[node19] node-26043:294:494 [1] NCCL INFO proxy.cc:972 -> 6 [Progress Thread]
+[node19] [rank7]:[E826 20:26:43.310281349 ProcessGroupNCCL.cpp:608] [Rank 7] Collective WorkNCCL(SeqNum=1, OpType=ALLREDUCE, NumelIn=1048576, NumelOut=1048576, Timeout(ms)=180000) raised the following async exception: NCCL error: remote process exited or there was a network error, NCCL version 2.28.3
+[node19] ncclRemoteError: A call failed possibly due to a network error or a remote process exiting prematurely.
+[node19] Last error:
+[node19] NET/IB: Got completion from peer node20<38319> with status=4 opcode=0 len=0 vendor err 81 (Send) hca mlx5_15
+[node19] Exception raised from checkForNCCLErrorsInternal at /opt/pytorch/pytorch/torch/csrc/distributed/c10d/ProcessGroupNCCL.cpp:2717 (most recent call first):
+[node19] frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x88 (0x7f357be63d98 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+[node19] frame #1: <unknown function> + 0xc64bee (0x7f357cbd4bee in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+[node19] frame #2: c10d::ProcessGroupNCCL::checkForNCCLErrorsInternal(std::shared_ptr<c10d::NCCLComm>&) + 0x342 (0x7f357cbf30c2 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+[node19] frame #3: c10d::ProcessGroupNCCL::WorkNCCL::checkAndSetException() + 0x76 (0x7f357cbf6e76 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+[node19] frame #4: c10d::ProcessGroupNCCL::Watchdog::runLoop() + 0xa58 (0x7f357cbfa748 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+[node19] frame #5: c10d::ProcessGroupNCCL::Watchdog::run() + 0x104 (0x7f357cbfc764 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cuda.so)
+[node19] frame #6: <unknown function> + 0xecdb4 (0x7f357b57bdb4 in /lib/x86_64-linux-gnu/libstdc++.so.6)
+[node19] frame #7: <unknown function> + 0x9caa4 (0x7f35b36baaa4 in /lib/x86_64-linux-gnu/libc.so.6)
+[node19] frame #8: __clone + 0x44 (0x7f35b3747a34 in /lib/x86_64-linux-gnu/libc.so.6)
+[node19]
+[node19] [rank7]:[E826 20:26:43.311238445 ProcessGroupNCCL.cpp:2251] [PG ID 0 PG GUID 0(default_pg) Rank 7]  failure detected by watchdog at work sequence id: 1 PG status: last enqueued work: 1, last completed work: -1
+[node19] [rank7]:[E826 20:26:43.311245601 ProcessGroupNCCL.cpp:732] Stack trace of the failed collective not found, potentially because FlightRecorder is disabled. You can enable it by setting TORCH_NCCL_TRACE_BUFFER_SIZE to a non-zero value.
+[node19] [rank7]:[E826 20:26:43.311295759 ProcessGroupNCCL.cpp:2583] [PG ID 0 PG GUID 0(default_pg) Rank 7] First PG on this rank to signal dumping.
+[node20] [rank14]:[E826 20:26:43.252022699 ProcessGroupNCCL.cpp:608] [Rank 14] Collective WorkNCCL(SeqNum=1, OpType=ALLREDUCE, NumelIn=1048576, NumelOut=1048576, Timeout(ms)=180000) raised the following async exception: NCCL error: remote process exited or there was a network error, NCCL version 2.28.3
