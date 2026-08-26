@@ -47,6 +47,8 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/common.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib_train_params.sh"
 
 die() { echo "[ERROR] $*" >&2; exit 1; }
 
@@ -68,8 +70,10 @@ while [[ $# -gt 0 ]]; do
     --gpus)        GPUS="${2:?}"; shift 2 ;;
     --master-port) MASTER_PORT_ARG="${2:?}"; shift 2 ;;
     --run-id)      RUN_ID="${2:?}"; shift 2 ;;
-    -h|--help)     sed -n '4,44p' "$0"; exit 0 ;;
-    *)             PASSTHRU+=("$1"); shift ;;
+    -h|--help)     sed -n '4,44p' "$0"; train_params_help; exit 0 ;;
+    *)
+      if train_param_try "$1" "${2:-}"; then shift "$TRAIN_PARAM_SHIFT"; continue; fi
+      PASSTHRU+=("$1"); shift ;;
   esac
 done
 
@@ -125,6 +129,10 @@ RUN_ID="${RUN_ID:-train${VERSION//./}_multi_$(date +%Y%m%d_%H%M%S)}"
 echo "[INFO] mode=multi nnodes=${NNODES} gpus_per_node=${GPUS} world_size_gpus=${WORLD}"
 echo "[INFO] rank0=${FIRST} (MASTER_ADDR source) hosts=${HOSTS[*]}"
 echo "[INFO] version=${VERSION} benchmark=${BENCHMARK} gpu_type=${GPU_TYPE} run_id=${RUN_ID}"
+
+# Multi node: world size spans every rank, so TP x PP x CP may exceed one node.
+train_params_validate "$WORLD" "$GPUS"
+train_params_export
 if [[ -n "${NCCL_IB_HCA:-}${NCCL_SOCKET_IFNAME:-}${MASTER_ADDR:-}" ]]; then
   echo "[INFO] RDMA overrides in effect: HCA=${NCCL_IB_HCA:-auto} IFNAME=${NCCL_SOCKET_IFNAME:-auto} MASTER_ADDR=${MASTER_ADDR:-auto}"
 else

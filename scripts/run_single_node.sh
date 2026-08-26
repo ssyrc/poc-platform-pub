@@ -31,6 +31,8 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/common.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib_train_params.sh"
 
 die() { echo "[ERROR] $*" >&2; exit 1; }
 
@@ -52,8 +54,10 @@ while [[ $# -gt 0 ]]; do
     --gpu-type)  GPU_TYPE="${2:?}"; shift 2 ;;
     --gpus)      GPUS="${2:?}"; shift 2 ;;
     --run-id)    RUN_ID="${2:?}"; shift 2 ;;
-    -h|--help)   sed -n '4,30p' "$0"; exit 0 ;;
-    *)           PASSTHRU+=("$1"); shift ;;
+    -h|--help)   sed -n '4,30p' "$0"; train_params_help; exit 0 ;;
+    *)
+      if train_param_try "$1" "${2:-}"; then shift "$TRAIN_PARAM_SHIFT"; continue; fi
+      PASSTHRU+=("$1"); shift ;;
   esac
 done
 
@@ -104,6 +108,12 @@ RUN_ID="${RUN_ID:-${SUITE}${VERSION//./}_single_$(date +%Y%m%d_%H%M%S)}"
 
 echo "[INFO] mode=single host=${HOST} gpu_type=${GPU_TYPE} gpus=${GPUS}"
 echo "[INFO] suite=${SUITE} version=${VERSION} benchmark=${BENCHMARK} run_id=${RUN_ID}"
+
+# Single node: world size is just this host's GPU count.
+if [[ "$SUITE" == "training" ]]; then
+  train_params_validate "$GPUS" "$GPUS"
+  train_params_export
+fi
 
 # NUM_GPUS is how the launchers learn the per-host GPU count in single mode.
 export NUM_GPUS="$GPUS"
