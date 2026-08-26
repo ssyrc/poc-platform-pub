@@ -72,7 +72,7 @@ ALL_GPUS = ["V100", "A100", "H100", "GH200", "B300", "RTX6000", "RTX_PRO_6000"]
 SUPPORTED_MLPERF = {
     # Keep UI/API validation aligned with the bash scripts so invalid GPU
     # selections fail before launching remote jobs.
-    ("training", "v4.1"): {"benchmarks": ["llama2_70b_lora"], "gpus": ["V100", "A100", "H100", "GH200"]},
+    ("training", "v4.1"): {"benchmarks": ["llama2_70b_lora"], "gpus": ["V100", "A100", "H100", "GH200", "B300"]},
     ("training", "v5.1"): {"benchmarks": ["llama2_70b_lora", "llama31_8b"], "gpus": ["V100", "A100", "H100", "RTX6000", "RTX_PRO_6000", "GH200", "B300"]},
     ("inference", "v5.1"): {"benchmarks": ["llama2_70b"], "gpus": ALL_GPUS},
     ("inference", "v6.0"): {"benchmarks": ["llama2_70b"], "gpus": ALL_GPUS},

@@ -24,6 +24,7 @@ Supported GPU:
   A100
   H100
   GH200
+  B300
 
 Data root:
   /opt/poc-platform/data
@@ -39,7 +40,7 @@ Docker image tar root:
 Options:
   --stop
   --run-id <id>
-  --gpu-type A100|H100|GH200
+  --gpu-type A100|H100|GH200|B300
   --host <hostname-or-ip>
   --benchmark llama2_70b_lora
   --docker-image <image>
@@ -141,8 +142,8 @@ fi
 [[ -n "$GPU_TYPE" ]] || die "--gpu-type is required"
 
 case "$GPU_TYPE" in
-  V100|A100|H100|GH200) ;;
-  *) die "Training v4.1 supports only V100, A100, H100, GH200. Invalid gpu-type: ${GPU_TYPE}" ;;
+  V100|A100|H100|GH200|B300) ;;
+  *) die "Training v4.1 supports only V100, A100, H100, GH200, B300. Invalid gpu-type: ${GPU_TYPE}" ;;
 esac
 
 case "$BENCHMARK" in
@@ -566,8 +567,17 @@ case "$GPU_TYPE" in
     DOCKER_IMAGE="${USER_DOCKER_IMAGE:-$IMAGE_GH200_ARM64}"
     FALLBACK_TAR="$TAR_GH200_ARM64"
     ;;
+  B300)
+    # v4.1 predates Blackwell, so there is no default image for it here: the
+    # x86 image above is built for Hopper and would fail on sm_100/sm_103.
+    # Supply a Blackwell-capable v4.1 image explicitly, either per run with
+    # --docker-image or once via IMAGE_B300_AMD64 in .env.
+    DOCKER_IMAGE="${USER_DOCKER_IMAGE:-${IMAGE_B300_AMD64:-}}"
+    FALLBACK_TAR="${TAR_B300_AMD64:-}"
+    [[ -n "$DOCKER_IMAGE" ]] || fail_run "training v4.1 on B300 requires a Blackwell-capable image: pass --docker-image, or set IMAGE_B300_AMD64 in .env." 68
+    ;;
   *)
-    fail_run "Training v4.1 supports only V100, A100, H100, GH200. Invalid gpu-type: ${GPU_TYPE}" 69
+    fail_run "Training v4.1 supports only V100, A100, H100, GH200, B300. Invalid gpu-type: ${GPU_TYPE}" 69
     ;;
 esac
 
@@ -599,6 +609,12 @@ case "$GPU_TYPE" in
     ;;
   GH200)
     GPU_ARCH_VALUE="gh200"
+    ;;
+  B300)
+    # Upstream v4.1 ships no Blackwell config, so this value will not match a
+    # stock config_*.sh. Override with GPU_ARCH=<name> to point at whichever
+    # config the supplied image actually carries.
+    GPU_ARCH_VALUE="${GPU_ARCH:-b200}"
     ;;
 esac
 FP8_VALUE="False"
