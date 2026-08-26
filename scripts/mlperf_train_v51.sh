@@ -1110,6 +1110,20 @@ if [[ "${PP}" == "1" ]]; then
   )
 fi
 
+# Sequence parallelism splits the sequence dimension across the tensor-parallel
+# group, so it is meaningless -- and rejected -- when that group has one rank:
+#   model_parallel_config.py: raise ValueError(
+#       "Can not use sequence paralllelism without tensor parallelism")
+# The shipped 8b config leaves model.sequence_parallel on, which makes any TP=1
+# run (a single-GPU smoke test, for instance) die in config validation before
+# the model is built. Same treatment as PP=1 above.
+if [[ "${TP}" == "1" ]]; then
+  echo "[CONTAINER] TP=1 detected; disabling sequence parallelism"
+  OVERRIDES+=(
+    "++model.sequence_parallel=False"
+  )
+fi
+
 append_extra_hydra_overrides_safe() {
   local ov
   if [[ -n "${MLPERF_EXTRA_OVERRIDES:-}" ]]; then
