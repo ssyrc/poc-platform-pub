@@ -168,28 +168,21 @@ NCCL_IB_HCA='mlx5_0,mlx5_1,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx
 
 ---
 
-## STEP 5 — 지금 당장 학습을 돌려야 한다면 (Socket)
+## STEP 5 — Socket은 쓰지 않습니다
 
-느리지만 **동작은 합니다.** IB 조사와 병행해서 돌려두셔도 됩니다.
+Socket 성공은 **진단 결과일 뿐**입니다. "NCCL과 노드 간 경로 자체는 멀쩡하고,
+IB의 GPU 메모리 등록만 깨졌다"를 증명한 것이지 대안이 아닙니다.
 
-```bash
-NCCL_NET_PLUGIN=none \
-NCCL_NET=Socket NCCL_SOCKET_IFNAME='=bond0.3061' NCCL_SOCKET_FAMILY=AF_INET \
-NCCL_IB_DISABLE=1 \
-UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
-./scripts/run_multi_node.sh --hosts $N1,$N2 \
-  --benchmark llama31_8b --docker-image $IMG \
-  --tp 8 --pp 1 --cp 1 --mbs 1 --gbs 256 --max-steps 10
-```
+노드 간 대역폭이 IB 대비 크게 떨어져 멀티노드 스케일링 수치가 의미 없어지므로
+**벤치마크에는 쓰지 않습니다.** 실행 스크립트에도 반영하지 않았습니다.
 
-**정식 측정용은 아닙니다.** 노드 간 대역폭이 IB 대비 크게 떨어져서
-멀티노드 스케일링 수치가 의미 없게 나옵니다. 동작 확인용으로만 쓰세요.
+> 확인: `mlperf_train_v51.sh` / `v41.sh` / `run_*.sh` 어디에도 `NCCL_NET=Socket`이나
+> `NCCL_SOCKET_IFNAME` 기본값은 없습니다. 값을 설정하는 곳은 B300의
+> `NCCL_NET_PLUGIN=none` 하나뿐이고, 나머지 `NCCL_*`는 **직접 줬을 때만 전달**되는
+> allowlist 항목입니다. `mlperf_run.sh`의 `NCCL_IB_HCA` / `NCCL_IB_DISABLE=0` /
+> `NCCL_SOCKET_IFNAME`은 원본 zip 그대로인 IB 자동 바인딩 코드입니다.
 
-로그에서 런처가 고른 값도 확인해 주세요. 자동 탐지가 엉뚱한 걸 골랐을 수 있습니다.
-
-```
-NCCL_IB_HCA=...  NCCL_SOCKET_IFNAME=...  MASTER_ADDR=...
-```
+멀티노드 학습은 **IB가 살아난 뒤에** 돌립니다.
 
 ---
 
@@ -200,7 +193,7 @@ NCCL_IB_HCA=...  NCCL_SOCKET_IFNAME=...  MASTER_ADDR=...
 1. STEP 1 — `NCCL_DMABUF_ENABLE=0` 결과
 2. STEP 2 — `NCCL_NET_GDR_LEVEL=0` 결과
 3. STEP 3 — 두 노드의 `nvidia_peermem` 상태, ACS
-4. STEP 5를 돌렸다면 런처가 고른 `NCCL_SOCKET_IFNAME`
+4. STEP 4를 돌렸다면 그 결과
 
 1과 2 중 하나만 통과해도 결론이 납니다.
 
