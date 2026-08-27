@@ -62,7 +62,7 @@ NCCL은 GPU 메모리 등록에 **dma-buf**를 우선 씁니다. `nvidia_peermem
 
 ## 준비
 
-**`git pull` 필요** (`아래 커밋` — `NCCL_DMABUF_ENABLE`, `NCCL_NET_GDR_LEVEL`,
+**`git pull` 필요** (`cb7737e` — `NCCL_DMABUF_ENABLE`, `NCCL_NET_GDR_LEVEL`,
 `NCCL_SOCKET_FAMILY` 등 forward 추가).
 
 ```bash
