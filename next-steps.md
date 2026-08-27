@@ -80,75 +80,123 @@ UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1"
 
 ---
 
-## STEP 1 — dma-buf 끄고 IB (30초, 제일 먼저)
+## 시나리오 — `status=4`가 나올 수 있는 경우 (가능성 순)
 
-**가장 좋은 결과가 나올 수 있는 시도입니다.** GDR은 그대로 두고 등록 경로만 바꿉니다.
+`status=4` = `IBV_WC_LOC_PROT_ERR`. **"HCA가 로컬 메모리에 접근할 권한이 없다"** 입니다.
+NCCL이 IB로 보내는 버퍼는 GPU 메모리이므로, 아래는 전부 "GPU 메모리를 NIC가 못 읽는다"의
+서로 다른 원인들입니다.
+
+| # | 상황 | 확인 | 조치 | 성능 대가 |
+|---|---|---|---|---|
+| A | dma-buf 등록이 겉으로만 성공 | `NCCL_DMABUF_ENABLE=0`으로 통과 | 그 값 유지 + MOFED/드라이버 갱신 | **없음** |
+| B | `nvidia_peermem` 미로드 | `lsmod`에 없음 | `modprobe nvidia_peermem` | 없음 |
+| C | GPU BAR1이 작음 | `nvidia-smi -q`의 BAR1 용량 | BIOS: Above 4G Decoding, Resizable BAR | 없음 |
+| D | PCIe **ACS** 활성 | `lspci -vvv`에 `SrcValid+` | BIOS에서 ACS 해제 | 없음 |
+| E | IOMMU가 P2P 주소 변환 | `dmesg`에 iommu | 커널 파라미터 `iommu=pt` | 없음 |
+| F | IB/RoCE HCA 혼용 | `NET/IB` 목록에 RoCE 섞임 | `NCCL_IB_HCA`를 IB만 | 없음 |
+
+**C·D·E는 셋 다 "NIC가 GPU BAR에 직접 DMA를 못 하게 막는" 부류**입니다.
+새 서버 세팅에서 가장 흔하게 놓치는 것이 **C(BAR)와 D(ACS)** 입니다.
+
+---
+
+## 준비
+
+```bash
+N1=node19
+N2=node20
+IMG=registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell
+
+COMMON="NCCL_NET_PLUGIN=none NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET \
+UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1"
+```
+
+---
+
+## STEP 1 — GDR 껐다 켜서 부류부터 가르기 (30초)
+
+먼저 **"GDR 문제냐 아니냐"** 를 확정합니다. 이게 갈려야 나머지가 의미 있습니다.
+
+```bash
+env $COMMON NCCL_NET_GDR_LEVEL=LOC \
+./scripts/nccl_probe.sh --hosts $N1,$N2 --image $IMG
+```
+
+> `LOC`는 숫자 `0`과 같은 값입니다. NIC와 GPU가 "같은 디바이스"일 때만 GDR을 쓰라는 뜻이라
+> 사실상 GDR 해제입니다. 다른 곳에서 제안받으신 것과 동일한 테스트입니다.
+
+| 결과 | 결론 | 다음 |
+|---|---|---|
+| **통과** | **GDR 확정.** IB·파이버·QP는 정상 | STEP 2 |
+| status=4 계속 | GDR 문제 아님 | STEP 5 |
+
+---
+
+## STEP 2 — A인지 B~F인지 가르기 (30초)
+
+GDR은 켠 채로 **등록 경로만** 바꿉니다.
 
 ```bash
 env $COMMON NCCL_DMABUF_ENABLE=0 \
 ./scripts/nccl_probe.sh --hosts $N1,$N2 --image $IMG
 ```
 
-| 결과 | 의미 |
+| 결과 | 결론 |
 |---|---|
-| **통과** | dma-buf 등록이 범인. **GDR은 살아있고 성능 손실 없음** — 최선의 결과 |
-| status=4 계속 | 등록 방식 문제가 아님 → STEP 2 |
-
-이게 통과하려면 `nvidia_peermem`이 **양쪽 노드에** 올라와 있어야 합니다. STEP 3 먼저 보셔도 됩니다.
+| **통과** | **시나리오 A.** dma-buf만 깨진 것. 이 값 하나로 끝, 성능 손실 없음 |
+| status=4 계속 | A 아님 → B~F. STEP 3으로 |
 
 ---
 
-## STEP 2 — GDR 자체를 끄고 IB (30초, 판별용)
+## STEP 3 — 호스트 조건 B·C 확인 (ssh, 1분)
 
-GPU 메모리를 직접 안 보내고 **호스트 메모리를 경유**합니다.
-
-```bash
-env $COMMON NCCL_NET_GDR_LEVEL=0 \
-./scripts/nccl_probe.sh --hosts $N1,$N2 --image $IMG
-```
-
-| 결과 | 의미 |
-|---|---|
-| **통과** | **GDR 확정.** IB 자체는 정상, GPU 메모리 등록만 깨짐 |
-| status=4 계속 | GDR 문제가 아님. IB 설정 쪽 → STEP 4 |
-
-STEP 2가 통과하면 **당장 쓸 수 있는 답**이 생깁니다.
-GDR 없는 IB도 TCP Socket보다 훨씬 빠릅니다. 그걸로 벤치마크를 돌리면서 GDR을 고치면 됩니다.
-
----
-
-## STEP 3 — 호스트 쪽 GDR 조건 (ssh만, `git pull` 불필요)
-
-STEP 1·2와 병행하세요. **두 노드 다** 봐야 합니다.
+**두 노드 다** 봐야 합니다. 한쪽만 어긋나도 실패합니다.
 
 ```bash
 for h in $N1 $N2; do
   echo "=== $h ==="
-  ssh $h 'lsmod | grep -E "nvidia_peermem|nv_peer_mem" || echo "peermem: NOT LOADED"'
-  ssh $h 'cat /sys/module/nvidia/version 2>/dev/null; ofed_info -s 2>/dev/null | head -1'
+  # B: peermem
+  ssh $h 'lsmod | grep -E "nvidia_peermem|nv_peer_mem" || echo "  peermem: NOT LOADED"'
+  # C: BAR1 — GPU 메모리를 NIC에 노출하는 창. 작으면 등록이 실패합니다
+  ssh $h 'nvidia-smi -q | grep -iA3 "BAR1 Memory"| head -8'
 done
 ```
 
-`NOT LOADED`면 그것만으로 STEP 1이 실패합니다.
+**B 조치**
 
 ```bash
 ssh <노드> 'modprobe nvidia_peermem && echo nvidia_peermem > /etc/modules-load.d/nvidia-peermem.conf'
 ```
 
-### PCIe ACS — GDR을 조용히 죽이는 대표적 원인
-
-ACS가 켜져 있으면 NIC와 GPU 사이 peer-to-peer DMA가 루트 컴플렉스로 우회되거나 차단됩니다.
-`status=4`가 나오는 전형적인 조건입니다.
-
-```bash
-ssh $N1 'lspci -vvv 2>/dev/null | grep -i "ACSCtl" | grep -v "SrcValid-" | head'
-```
-
-`SrcValid+`가 보이면 ACS가 활성입니다. BIOS 또는 부팅 시 비활성화가 필요합니다.
+**C 판단**: B300은 BAR1이 GPU 메모리 크기에 맞먹게 잡혀야 정상입니다.
+수백 MB 수준으로 작게 나오면 BIOS에서 **Above 4G Decoding**과 **Resizable BAR**가 꺼진 것입니다.
+이건 재부팅이 필요합니다.
 
 ---
 
-## STEP 4 — HCA 목록 정리 (STEP 1·2가 다 실패했을 때)
+## STEP 4 — 호스트 조건 D·E 확인 (ssh, 1분)
+
+**D: PCIe ACS.** 켜져 있으면 NIC→GPU 직접 DMA가 루트 컴플렉스로 우회되면서 막힙니다.
+GDR을 죽이는 가장 대표적인 원인입니다.
+
+```bash
+ssh $N1 'lspci -vvv 2>/dev/null | grep -i ACSCtl | grep -v "SrcValid-" | head'
+```
+
+아무것도 안 나오면 ACS 해제 상태(정상)입니다. `SrcValid+`가 보이면 활성입니다.
+BIOS에서 끄거나, 부팅 스크립트로 PCIe 스위치마다 해제해야 합니다.
+
+**E: IOMMU.** 켜져 있으면 `iommu=pt`(passthrough)여야 GDR이 삽니다.
+
+```bash
+ssh $N1 'cat /proc/cmdline; dmesg | grep -iE "iommu|dmar" | head -5'
+```
+
+`intel_iommu=on`만 있고 `iommu=pt`가 없으면 커널 파라미터에 추가 후 재부팅.
+
+---
+
+## STEP 5 — F: HCA 목록 정리 (STEP 1이 통과 못 했을 때)
 
 이전 로그에 **IB와 RoCE가 섞여** 있었습니다.
 
@@ -157,14 +205,35 @@ ssh $N1 'lspci -vvv 2>/dev/null | grep -i "ACSCtl" | grep -v "SrcValid-" | head'
 [4..11] IB/SHARP      [12]mlx5_12:1/RoCE    [13]mlx5_13:1/RoCE  [14][15] IB/SHARP
 ```
 
-`mlx5_2, 3, 12, 13`이 RoCE입니다. 한 job에서 IB와 RoCE를 섞으면 문제가 생깁니다.
-IB만 남겨서 확인합니다.
+`mlx5_2, 3, 12, 13`이 RoCE입니다. IB만 남깁니다.
 
 ```bash
 env $COMMON \
 NCCL_IB_HCA='mlx5_0,mlx5_1,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx5_11,mlx5_14,mlx5_15' \
 ./scripts/nccl_probe.sh --hosts $N1,$N2 --image $IMG
 ```
+
+---
+
+## STEP 6 — NCCL 없이 GDR만 직접 재는 법 (선택)
+
+`ib_write_bw`를 **GPU 메모리로** 돌리면 NCCL을 빼고 GDR만 시험할 수 있습니다.
+(perftest가 CUDA 지원으로 빌드돼 있어야 합니다.)
+
+```bash
+# 서버 쪽
+ssh $N2 "docker run --rm --gpus all --network=host \
+  \$(for d in /dev/infiniband/*; do printf ' --device %s' \$d; done) \
+  $IMG ib_write_bw -d mlx5_0 --use_cuda=0"
+
+# 클라이언트 쪽
+ssh $N1 "docker run --rm --gpus all --network=host \
+  \$(for d in /dev/infiniband/*; do printf ' --device %s' \$d; done) \
+  $IMG ib_write_bw -d mlx5_0 --use_cuda=0 $N2"
+```
+
+`--use_cuda` 없이 되고 **있이 실패하면 GDR 문제 확정**입니다.
+NCCL을 완전히 배제한 증거라 벤더 문의할 때 쓰기 좋습니다.
 
 ---
 
@@ -190,12 +259,12 @@ IB의 GPU 메모리 등록만 깨졌다"를 증명한 것이지 대안이 아닙
 
 `Errors`에 붙여주세요.
 
-1. STEP 1 — `NCCL_DMABUF_ENABLE=0` 결과
-2. STEP 2 — `NCCL_NET_GDR_LEVEL=0` 결과
-3. STEP 3 — 두 노드의 `nvidia_peermem` 상태, ACS
-4. STEP 4를 돌렸다면 그 결과
+1. STEP 1 — `NCCL_NET_GDR_LEVEL=LOC` 통과 여부 (**부류를 가르는 것**)
+2. STEP 2 — `NCCL_DMABUF_ENABLE=0` 통과 여부
+3. STEP 3 — 두 노드의 `nvidia_peermem`, BAR1 용량
+4. STEP 4 — ACS, `/proc/cmdline`
 
-1과 2 중 하나만 통과해도 결론이 납니다.
+1이 갈리면 나머지 범위가 절반으로 줄고, 2가 통과하면 그걸로 끝납니다.
 
 ---
 
