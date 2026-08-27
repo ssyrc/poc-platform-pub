@@ -60,25 +60,6 @@ NCCL은 GPU 메모리 등록에 **dma-buf**를 우선 씁니다. `nvidia_peermem
 
 ---
 
-## 준비
-
-**`git pull` 필요** (`cb7737e` — `NCCL_DMABUF_ENABLE`, `NCCL_NET_GDR_LEVEL`,
-`NCCL_SOCKET_FAMILY` 등 forward 추가).
-
-```bash
-cd /mgmt/server/poc-platform/poc-platform-pub
-git pull
-
-N1=node19
-N2=node20
-IMG=registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell
-
-# 매번 붙일 공통 부분
-COMMON="NCCL_NET_PLUGIN=none NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET \
-UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1"
-```
-
----
 
 ## 시나리오 — `status=4`가 나올 수 있는 경우 (가능성 순)
 
@@ -88,21 +69,43 @@ NCCL이 IB로 보내는 버퍼는 GPU 메모리이므로, 아래는 전부 "GPU 
 
 | # | 상황 | 확인 | 조치 | 성능 대가 |
 |---|---|---|---|---|
-| A | dma-buf 등록이 겉으로만 성공 | `NCCL_DMABUF_ENABLE=0`으로 통과 | 그 값 유지 + MOFED/드라이버 갱신 | **없음** |
-| B | `nvidia_peermem` 미로드 | `lsmod`에 없음 | `modprobe nvidia_peermem` | 없음 |
-| C | GPU BAR1이 작음 | `nvidia-smi -q`의 BAR1 용량 | BIOS: Above 4G Decoding, Resizable BAR | 없음 |
-| D | PCIe **ACS** 활성 | `lspci -vvv`에 `SrcValid+` | BIOS에서 ACS 해제 | 없음 |
-| E | IOMMU가 P2P 주소 변환 | `dmesg`에 iommu | 커널 파라미터 `iommu=pt` | 없음 |
+| **A** | **PCIe ACS 활성** | `./scripts/acs_check.sh --host <노드>` | ACS 해제 (BIOS 또는 `setpci`) | **없음** |
+| B | GPU BAR1이 작음 | `nvidia-smi -q`의 BAR1 용량 | BIOS: Above 4G Decoding, Resizable BAR | 없음 |
+| C | IOMMU가 P2P 주소 변환 | `/proc/cmdline` | 커널 파라미터 `iommu=pt` | 없음 |
+| D | dma-buf 등록이 겉으로만 성공 | `NCCL_DMABUF_ENABLE=0`으로 통과 | 그 값 유지 + MOFED/드라이버 갱신 | 없음 |
+| E | `nvidia_peermem` 미로드 | `lsmod`에 없음 | `modprobe nvidia_peermem` | 없음 |
 | F | IB/RoCE HCA 혼용 | `NET/IB` 목록에 RoCE 섞임 | `NCCL_IB_HCA`를 IB만 | 없음 |
 
-**C·D·E는 셋 다 "NIC가 GPU BAR에 직접 DMA를 못 하게 막는" 부류**입니다.
-새 서버 세팅에서 가장 흔하게 놓치는 것이 **C(BAR)와 D(ACS)** 입니다.
+### A(ACS)를 1순위로 올린 이유
+
+다른 곳에서 **ACS를 끄니 멀티노드 NCCL이 됐다**는 보고가 있었고,
+무엇보다 **지금까지의 관찰을 전부 설명합니다.**
+
+| 관찰 | ACS로 설명되는가 |
+|---|---|
+| 단일 노드 8장 정상 | **설명됨.** GPU끼리는 NVLink. PCIe P2P도 NIC도 안 씀 |
+| `ib_write_bw` 정상 | **설명됨.** 호스트 메모리↔NIC는 P2P가 아님 |
+| Socket 멀티노드 정상 | **설명됨.** 호스트 메모리 경유. P2P 없음 |
+| IB 멀티노드만 `status=4` | **설명됨.** 여기서만 NIC가 GPU BAR에 직접 DMA |
+
+ACS는 같은 스위치 아래 장치 간 P2P 트랜잭션을 **루트 컴플렉스로 강제 우회**시킵니다.
+NIC가 GPU BAR로 보낸 DMA가 위로 끌려가 IOMMU 변환을 거치면, 등록 때 받은 버스 주소가
+더 이상 GPU 메모리로 해석되지 않고 → HCA가 local protection error를 냅니다.
+
+**A·B·C는 셋 다 "NIC가 GPU BAR에 직접 DMA를 못 하게 막는" 부류**이고,
+**D·E는 "등록 방법"** 문제입니다. 부류가 다르므로 아래 STEP 1으로 먼저 가릅니다.
 
 ---
 
 ## 준비
 
+**`git pull` 필요** — `cb7737e` (`NCCL_DMABUF_ENABLE` / `NCCL_NET_GDR_LEVEL` /
+`NCCL_SOCKET_FAMILY` forward), `acs_check.sh` 추가분.
+
 ```bash
+cd /mgmt/server/poc-platform/poc-platform-pub
+git pull
+
 N1=node19
 N2=node20
 IMG=registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell
@@ -113,7 +116,36 @@ UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1"
 
 ---
 
-## STEP 1 — GDR 껐다 켜서 부류부터 가르기 (30초)
+## STEP 1 — ACS 확인 (1분, 먼저)
+
+ssh만 씁니다. 설정을 바꾸지 않고 **읽기만** 합니다.
+
+```bash
+./scripts/acs_check.sh --host $N1
+./scripts/acs_check.sh --host $N2
+```
+
+빨간 줄이 나오면 그 브리지가 P2P를 우회시키고 있습니다.
+스크립트가 해제용 `setpci` 명령까지 만들어 주지만 **실행하지는 않습니다.**
+
+해제 후에는 반드시 프로브로 확인하세요.
+
+```bash
+env $COMMON ./scripts/nccl_probe.sh --hosts $N1,$N2 --image $IMG
+```
+
+**주의 세 가지**
+
+- `setpci`는 **재부팅하면 원복**됩니다. 영구 조치는 BIOS 설정(보통 "ACS Enable",
+  또는 IOMMU 항목 아래)이거나 부팅 시 재적용하는 systemd 유닛입니다.
+- ACS 해제는 **PCIe 장치 간 격리를 약화**시킵니다. 이 호스트에서 VM에 장치를
+  패스스루하거나 IOMMU 그룹 격리에 의존한다면 고려가 필요합니다.
+  전용 베어메탈 학습 노드라면 이게 정상 구성입니다.
+- **두 노드 다** 해제해야 합니다.
+
+---
+
+## STEP 2 — GDR 껐다 켜서 부류부터 가르기 (30초)
 
 먼저 **"GDR 문제냐 아니냐"** 를 확정합니다. 이게 갈려야 나머지가 의미 있습니다.
 
@@ -132,7 +164,7 @@ env $COMMON NCCL_NET_GDR_LEVEL=LOC \
 
 ---
 
-## STEP 2 — A인지 B~F인지 가르기 (30초)
+## STEP 3 — 등록 경로(D) 확인 (30초)
 
 GDR은 켠 채로 **등록 경로만** 바꿉니다.
 
@@ -143,12 +175,12 @@ env $COMMON NCCL_DMABUF_ENABLE=0 \
 
 | 결과 | 결론 |
 |---|---|
-| **통과** | **시나리오 A.** dma-buf만 깨진 것. 이 값 하나로 끝, 성능 손실 없음 |
-| status=4 계속 | A 아님 → B~F. STEP 3으로 |
+| **통과** | **시나리오 D.** dma-buf만 깨진 것. 이 값 하나로 끝, 성능 손실 없음 |
+| status=4 계속 | D 아님 → STEP 4로 |
 
 ---
 
-## STEP 3 — 호스트 조건 B·C 확인 (ssh, 1분)
+## STEP 4 — 호스트 조건 B·E 확인 (ssh, 1분)
 
 **두 노드 다** 봐야 합니다. 한쪽만 어긋나도 실패합니다.
 
@@ -174,7 +206,7 @@ ssh <노드> 'modprobe nvidia_peermem && echo nvidia_peermem > /etc/modules-load
 
 ---
 
-## STEP 4 — 호스트 조건 D·E 확인 (ssh, 1분)
+## STEP 5 — IOMMU(C) 확인 (ssh, 30초)
 
 **D: PCIe ACS.** 켜져 있으면 NIC→GPU 직접 DMA가 루트 컴플렉스로 우회되면서 막힙니다.
 GDR을 죽이는 가장 대표적인 원인입니다.
@@ -196,7 +228,7 @@ ssh $N1 'cat /proc/cmdline; dmesg | grep -iE "iommu|dmar" | head -5'
 
 ---
 
-## STEP 5 — F: HCA 목록 정리 (STEP 1이 통과 못 했을 때)
+## STEP 6 — F: HCA 목록 정리 (앞이 다 실패했을 때)
 
 이전 로그에 **IB와 RoCE가 섞여** 있었습니다.
 
@@ -215,7 +247,7 @@ NCCL_IB_HCA='mlx5_0,mlx5_1,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx
 
 ---
 
-## STEP 6 — NCCL 없이 GDR만 직접 재는 법 (선택)
+## STEP 7 — NCCL 없이 GDR만 직접 재는 법 (선택)
 
 `ib_write_bw`를 **GPU 메모리로** 돌리면 NCCL을 빼고 GDR만 시험할 수 있습니다.
 (perftest가 CUDA 지원으로 빌드돼 있어야 합니다.)
@@ -237,7 +269,7 @@ NCCL을 완전히 배제한 증거라 벤더 문의할 때 쓰기 좋습니다.
 
 ---
 
-## STEP 5 — Socket은 쓰지 않습니다
+## 참고 — Socket은 쓰지 않습니다
 
 Socket 성공은 **진단 결과일 뿐**입니다. "NCCL과 노드 간 경로 자체는 멀쩡하고,
 IB의 GPU 메모리 등록만 깨졌다"를 증명한 것이지 대안이 아닙니다.
@@ -255,16 +287,16 @@ IB의 GPU 메모리 등록만 깨졌다"를 증명한 것이지 대안이 아닙
 
 ---
 
-## STEP 6 — 회신
+## 회신
 
 `Errors`에 붙여주세요.
 
-1. STEP 1 — `NCCL_NET_GDR_LEVEL=LOC` 통과 여부 (**부류를 가르는 것**)
-2. STEP 2 — `NCCL_DMABUF_ENABLE=0` 통과 여부
-3. STEP 3 — 두 노드의 `nvidia_peermem`, BAR1 용량
-4. STEP 4 — ACS, `/proc/cmdline`
+1. STEP 1 — `acs_check.sh` 결과 (**지금 가장 유력**), 해제 후 프로브 결과
+2. STEP 2 — `NCCL_NET_GDR_LEVEL=LOC` 통과 여부
+3. STEP 3 — `NCCL_DMABUF_ENABLE=0` 통과 여부
+4. STEP 4·5 — `nvidia_peermem`, BAR1 용량, `/proc/cmdline`
 
-1이 갈리면 나머지 범위가 절반으로 줄고, 2가 통과하면 그걸로 끝납니다.
+STEP 1에서 ACS가 켜져 있으면 거기서 끝날 가능성이 높습니다.
 
 ---
 
