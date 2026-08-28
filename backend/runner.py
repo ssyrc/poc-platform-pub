@@ -25,7 +25,7 @@ import uuid
 from dataclasses import asdict
 from typing import Any, Dict, List, Optional, Tuple
 
-from . import gpu_monitor
+from . import gpu_monitor, ssh_route
 from .parser import parse_summary_line, parse_result_dir
 from .state import HostState, LogLine, RunState, STATE, now
 
@@ -754,6 +754,10 @@ async def start_run(req: RunRequest) -> RunState:
         status="running",
     )
     STATE.add_run(state)
+
+    # Sampling these hosts has to cross the same bastions the run does.
+    ssh_route.remember_hosts_network(
+        req.hosts, str(((req.params or {}).get("args") or {}).get("MLPERF_NETWORK") or ""))
 
     for h in req.hosts:
         gpu_monitor.acquire_host(h)

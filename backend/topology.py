@@ -29,6 +29,8 @@ import re
 import socket
 from typing import Dict, List, Optional, Tuple
 
+from . import ssh_route
+
 # best (lowest) wins
 _AFFINITY_RANK = {"PIX": 0, "PXB": 1, "PHB": 2, "NODE": 3, "SYS": 4, "X": 99}
 
@@ -154,8 +156,7 @@ def _topo_cmd(host: str) -> List[str]:
     smi = ["nvidia-smi", "topo", "-m"]
     if host in _local_names():
         return smi
-    return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=6",
-            "-o", "StrictHostKeyChecking=accept-new", host, " ".join(smi)]
+    return ssh_route.ssh_cmd(host, " ".join(smi))
 
 
 _CACHE: Dict[str, Dict] = {}
@@ -199,8 +200,7 @@ def _gpu_state_cmd(host: str) -> List[str]:
     q = "nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader,nounits"
     if host in _local_names():
         return ["bash", "-lc", q]
-    return ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=6",
-            "-o", "StrictHostKeyChecking=accept-new", host, q]
+    return ssh_route.ssh_cmd(host, q)
 
 
 async def find_free_gpus(host: str, count: int = 4,

@@ -23,6 +23,7 @@ import re
 import socket
 from typing import List, Optional
 
+from . import ssh_route
 from .state import STATE, GpuSample, HostGpuStream, now
 
 log = logging.getLogger("gpu_monitor")
@@ -102,7 +103,7 @@ def canonical_gpu_type(raw_name: str) -> str:
     return name
 
 
-def _detect_gpu_type_cmd(host: str) -> List[str]:
+def _detect_gpu_type_cmd(host: str, network: Optional[str] = None) -> List[str]:
     # Keep this shell-only so it works over bare SSH without requiring Python
     # helpers on worker nodes. Some nvidia-smi versions reject --query-gpu
     # unless --format is present, so the preferred command always includes it.
@@ -147,19 +148,17 @@ exit 127
 """.strip()
     if _is_local(host):
         return ["bash", "-lc", script]
-    return [
-        "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=6",
-        "-o", "StrictHostKeyChecking=accept-new", host, script,
-    ]
+    return ssh_route.ssh_cmd(host, script, network=network, connect_timeout=6)
 
 
-async def detect_gpu_type(host: str) -> dict:
+async def detect_gpu_type(host: str, network: Optional[str] = None) -> dict:
     """Best-effort accelerator type detection for one host.
 
     Returns {host, gpu_type, raw_names, source, error}. If one host has mixed
     product families, gpu_type is MIXED and raw_names preserves all values.
     """
-    cmd = _detect_gpu_type_cmd(host)
+    ssh_route.remember_host_network(host, network)
+    cmd = _detect_gpu_type_cmd(host, network)
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -232,14 +231,7 @@ def _build_cmd(host: str) -> List[str]:
     combined = f"{smi}; {nic}"
     if _is_local(host):
         return ["bash", "-c", combined]
-    return [
-        "ssh",
-        "-o", "BatchMode=yes",
-        "-o", "ConnectTimeout=5",
-        "-o", "StrictHostKeyChecking=accept-new",
-        host,
-        combined,
-    ]
+    return ssh_route.ssh_cmd(host, combined, connect_timeout=5)
 
 
 def _to_float(value: str) -> float:

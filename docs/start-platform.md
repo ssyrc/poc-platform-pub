@@ -149,18 +149,17 @@ MLPerf 탭 맨 위 `network` 버튼 — **S 슈퍼컴망**(기본, 직접 접속
 
 ### 3-2. hosts 넣고 GPU 타입이 잡히는지 보기
 
-`hosts` 에 노드를 넣으면 프론트가 `/api/hosts/{host}/gpu_type` 을 부릅니다. `B300` 이
-떠야 정상입니다 — 이게 뜬다는 것은 **선택한 network 로 그 노드에 ssh 가 실제로 붙었다**는
-뜻이라, 여기까지가 사실상 연결 테스트입니다.
+run 을 걸면 백엔드가 각 호스트의 GPU 타입을 `nvidia-smi` 로 직접 확인하고, 실시간
+GPU/NIC 샘플링도 붙습니다. **이 ssh 도 선택한 network 의 경유 체인을 그대로 탑니다** —
+벤치마크 스크립트와 같은 `.env` 설정을 씁니다.
 
-CLI 로 같은 걸 확인하려면:
+CLI 로 미리 확인하려면 network 를 쿼리 파라미터로 주면 됩니다.
 
 ```bash
-curl -s localhost:8100/api/hosts/node26/gpu_type
+curl -s 'localhost:8100/api/hosts/node26/gpu_type?network=h_hpc'
 ```
 
-(이 엔드포인트는 UI 선택과 무관하게 `.env` 의 `MLPERF_SSH_JUMP` / 기본 network 를 씁니다.
-`h_hpc` 만 설정된 상태에서 CLI 로 확인하려면 `MLPERF_SSH_JUMP` 를 쓰세요.)
+`network` 를 생략하면 `.env` 의 `MLPERF_NETWORK` 를 쓰고, 그것도 없으면 직접 접속합니다.
 
 ### 3-3. dry-run 먼저
 

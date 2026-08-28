@@ -48,7 +48,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
-from . import cluster, gpu_monitor, runner
+from . import cluster, gpu_monitor, runner, ssh_route
 from .parser import parse_log_buffer_lines, parse_result_dir
 from .runner import RunRequest
 from .seed import DEFAULT_ACCELERATOR_PERF, DEFAULT_GPU_TCO_TABLE
@@ -216,8 +216,8 @@ async def get_config():
 
 
 @app.get("/api/hosts/{host}/gpu_type")
-async def detect_host_gpu_type(host: str):
-    return await gpu_monitor.detect_gpu_type(host)
+async def detect_host_gpu_type(host: str, network: Optional[str] = None):
+    return await gpu_monitor.detect_gpu_type(host, network)
 
 def _positive_int_arg(args: Dict[str, Any], *names: str) -> Optional[int]:
     for name in names:
@@ -346,6 +346,16 @@ def _hosts_for_gpu_detection(body: StartRunBody) -> List[str]:
     return [_clean_host_value(h) for h in (body.hosts or []) if _clean_host_value(h)]
 
 
+def _network_for_body(body: StartRunBody) -> Optional[str]:
+    """The network id the UI selected for this run, if any."""
+    args = (body.params or {}).get("args") or {}
+    if isinstance(args, dict):
+        value = str(args.get("MLPERF_NETWORK") or "").strip()
+        if value:
+            return value
+    return None
+
+
 async def _resolve_gpu_types_for_body(body: StartRunBody) -> None:
     """Best-effort host GPU auto-detection before validation/launch.
 
@@ -357,9 +367,14 @@ async def _resolve_gpu_types_for_body(body: StartRunBody) -> None:
     if not hosts:
         return
 
+    # The run names its network in params.args; detection has to take the same
+    # route the run will, or a host behind a bastion looks unreachable here.
+    network = _network_for_body(body)
+    ssh_route.remember_hosts_network(hosts, network)
+
     existing = dict(body.node_gpu_map or {})
     detections = await asyncio.gather(
-        *[gpu_monitor.detect_gpu_type(h) for h in hosts],
+        *[gpu_monitor.detect_gpu_type(h, network) for h in hosts],
         return_exceptions=True,
     )
 
@@ -1471,7 +1486,8 @@ def _now() -> float:
 
 
 @app.get("/api/hosts/{host}/gpu")
-async def get_gpu_recent(host: str, n: int = 60):
+async def get_gpu_recent(host: str, n: int = 60, network: Optional[str] = None):
+    ssh_route.remember_host_network(host, network)
     gpu_monitor.ensure_monitor(host)
     s = STATE.get_or_create_gpu_stream(host)
     samples = list(s.samples)[-n:]
@@ -1484,7 +1500,8 @@ async def get_gpu_recent(host: str, n: int = 60):
 
 
 @app.get("/api/hosts/{host}/gpu/stream")
-async def stream_gpu(host: str, replay: bool = True):
+async def stream_gpu(host: str, replay: bool = True, network: Optional[str] = None):
+    ssh_route.remember_host_network(host, network)
     gpu_monitor.ensure_monitor(host)
 
     async def gen():
