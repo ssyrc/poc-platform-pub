@@ -2587,6 +2587,16 @@
       gpus: ["V100", "A100", "H100", "GH200", "B300", "RTX6000", "RTX_PRO_6000"] },
   };
 
+  // Which network a run targets. The id is all the UI sends; the bastion chain
+  // behind it lives in .env as MLPERF_NET_<ID>_JUMP, so addresses stay out of
+  // the browser and out of run history.
+  const NETWORKS = [
+    { id: "s_sc",   label: "S 슈퍼컴망", hint: "직접 접속" },
+    { id: "s_ddz",  label: "S DDZ망",    hint: "미구성" },
+    { id: "h_hpc",   label: "H HPC센터",  hint: "경유 접속" },
+  ];
+  const NETWORK_DEFAULT = "s_sc";
+
   const ALL_GPUS = ["V100", "A100", "H100", "GH200", "B300", "RTX6000", "RTX_PRO_6000"];
   const SUPPORTED_VLLM = {
     engines: ["vllm", "sglang"],
@@ -3276,6 +3286,17 @@
       }
     });
 
+    const NETWORK_STORAGE_KEY = "mlperf_platform_network_v1";
+    const [network, setNetwork] = useState(() => {
+      try {
+        const saved = window.localStorage.getItem(NETWORK_STORAGE_KEY);
+        return NETWORKS.some((n) => n.id === saved) ? saved : NETWORK_DEFAULT;
+      } catch (_) { return NETWORK_DEFAULT; }
+    });
+    useEffect(() => {
+      try { window.localStorage.setItem(NETWORK_STORAGE_KEY, network); } catch (_) {}
+    }, [network]);
+
     const [expandedArgHosts, setExpandedArgHosts] = useState(() => new Set());
     const hostsRef = useRef(null);
 
@@ -3505,7 +3526,7 @@
           hosts,
           node_gpu_map: nodeGpuMap,
           dry_run: dryRun,
-          params: { args: {}, args_by_host: argsByHost },
+          params: { args: { MLPERF_NETWORK: network }, args_by_host: argsByHost },
         });
       } catch (e) {
         setError(String(e.message || e));
@@ -3554,6 +3575,26 @@
                   >
                     {cap.gpus.map((g) => <option key={g} value={g}>{g}</option>)}
                   </select>
+                </MlperfField>
+                <MlperfField label="network" hint={NETWORKS.find((n) => n.id === network)?.hint || ""}>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {NETWORKS.map((n) => (
+                      <button
+                        key={n.id}
+                        type="button"
+                        onClick={() => setNetwork(n.id)}
+                        title={n.hint}
+                        className={
+                          "px-2 py-2 rounded-md text-[11px] font-mono border transition-colors " +
+                          (network === n.id
+                            ? "bg-volt/15 border-volt/50 text-volt"
+                            : "bg-ink-850 border-line text-fog-400 hover:text-fog-100 hover:border-fog-500")
+                        }
+                      >
+                        {n.label}
+                      </button>
+                    ))}
+                  </div>
                 </MlperfField>
                 <MlperfField label="hosts">
                   <textarea
