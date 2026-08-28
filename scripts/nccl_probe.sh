@@ -92,6 +92,33 @@ hosts_expand HOSTS "${HOST_SPECS[@]}" || exit 64
 NNODES="${#HOSTS[@]}"
 MASTER_ADDR="${MASTER_ADDR_ARG:-${HOSTS[0]}}"
 
+# Ask the first host what it has: the GPU count (torchrun needs the same
+# --nproc_per_node on every node or the ranks disagree about the world size)
+# and the model, which decides the B300 default below.
+_probe_out="$(cm_remote_bash "${HOSTS[0]}" <<'P' || true
+command -v nvidia-smi >/dev/null 2>&1 || { printf '|0\n'; exit 0; }
+printf '%s|%s\n' \
+  "$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)" \
+  "$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l)"
+P
+)"
+_probe_out="$(printf '%s' "$_probe_out" | tail -1 | tr -d '\r')"
+GPU_NAME="${_probe_out%%|*}"
+if [[ -z "$GPUS" ]]; then
+  GPUS="$(printf '%s' "${_probe_out##*|}" | tr -dc '0-9')"
+  [[ -n "$GPUS" && "$GPUS" != "0" ]] || die "could not detect GPU count on ${HOSTS[0]} -- pass --gpus"
+  echo "[INFO] gpus_per_node=${GPUS} (detected on ${HOSTS[0]}: ${GPU_NAME:-unknown})"
+fi
+
+# Same default mlperf_train_v51.sh applies inside the container: on B300 the
+# HPC-X plugin this image injects segfaults in ncclCommInitRankConfig. Without
+# it here, the probe fails where a real run would have succeeded -- and the
+# crash looks like a fabric fault rather than a missing setting.
+if [[ -z "${NCCL_NET_PLUGIN:-}" && "$(printf '%s' "$GPU_NAME" | tr '[:lower:]' '[:upper:]')" == *B300* ]]; then
+  export NCCL_NET_PLUGIN="none"
+  echo "[INFO] B300 detected: NCCL_NET_PLUGIN=none (HPC-X plugin crashes ncclCommInitRankConfig)"
+fi
+
 PASS_ENV=(
   NCCL_DEBUG NCCL_DEBUG_SUBSYS
   NCCL_MNNVL_ENABLE NCCL_CUMEM_ENABLE NCCL_NVLS_ENABLE
@@ -130,16 +157,6 @@ else
 fi
 
 PROBE_B64="$(base64 -w0 < "${SCRIPT_DIR}/nccl_probe.py")"
-
-# GPUs per node is decided once, on the first host, and used for every node --
-# torchrun needs the same --nproc_per_node everywhere or the world size the
-# ranks agree on will not match.
-if [[ -z "$GPUS" ]] && (( NNODES > 1 )); then
-  GPUS="$(cm_remote_bash "${HOSTS[0]}" <<<'nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l' || true)"
-  GPUS="$(echo "$GPUS" | tr -dc '0-9')"
-  [[ -n "$GPUS" && "$GPUS" != "0" ]] || die "could not detect GPU count on ${HOSTS[0]} -- pass --gpus"
-  echo "[INFO] gpus_per_node=${GPUS} (detected on ${HOSTS[0]})"
-fi
 
 # One node: torchrun --standalone, no rendezvous, exactly as before.
 # Several: each host runs its own torchrun with its node_rank, all meeting at
