@@ -140,3 +140,32 @@ train_params_help() {
     --extra-overrides "..."  extra Hydra overrides passed through
 EOH
 }
+
+# Flags that legitimately take no value; everything else beginning with -- is
+# expected to be followed by one.
+_PASSTHRU_NO_VALUE=(--dry-run --stop --help -h)
+
+# passthru_validate <arg>... -- refuse a flag whose value is missing.
+#
+# `--docker-image $IMG` with IMG unset collapses to a bare `--docker-image`.
+# It then reaches mlperf_run.sh as the final argument, where `shift 2` runs out
+# of arguments, and under `set -e` that exits 1 with nothing printed at all --
+# indistinguishable from a broken cluster. Catch it here instead.
+passthru_validate() {
+  local args=("$@") i a nxt v
+  for i in "${!args[@]}"; do
+    a="${args[$i]}"
+    [[ "$a" == --* ]] || continue
+    for v in "${_PASSTHRU_NO_VALUE[@]}"; do
+      [[ "$a" == "$v" ]] && continue 2
+    done
+    nxt="${args[$((i+1))]:-}"
+    if [[ -z "$nxt" || "$nxt" == --* ]]; then
+      echo "[ERROR] ${a} has no value." >&2
+      echo "[ERROR] A shell variable used for it is probably empty -- check with:" >&2
+      echo "[ERROR]   echo \"IMG=[\$IMG] TAR=[\$TAR]\"" >&2
+      return 64
+    fi
+  done
+  return 0
+}

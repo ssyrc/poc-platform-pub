@@ -47,13 +47,13 @@ PASSTHRU=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --host)      HOST="${2:?}"; shift 2 ;;
-    --suite)     SUITE="${2:?}"; shift 2 ;;
-    --version)   VERSION="${2:?}"; shift 2 ;;
-    --benchmark) BENCHMARK="${2:?}"; shift 2 ;;
-    --gpu-type)  GPU_TYPE="${2:?}"; shift 2 ;;
-    --gpus)      GPUS="${2:?}"; shift 2 ;;
-    --run-id)    RUN_ID="${2:?}"; shift 2 ;;
+    --host)      HOST="${2:?--host needs a value}"; shift 2 ;;
+    --suite)     SUITE="${2:?--suite needs a value}"; shift 2 ;;
+    --version)   VERSION="${2:?--version needs a value}"; shift 2 ;;
+    --benchmark) BENCHMARK="${2:?--benchmark needs a value}"; shift 2 ;;
+    --gpu-type)  GPU_TYPE="${2:?--gpu-type needs a value}"; shift 2 ;;
+    --gpus)      GPUS="${2:?--gpus needs a value}"; shift 2 ;;
+    --run-id)    RUN_ID="${2:?--run-id needs a value}"; shift 2 ;;
     -h|--help)   sed -n '4,30p' "$0"; train_params_help; exit 0 ;;
     *)
       if train_param_try "$1" "${2:-}"; then shift "$TRAIN_PARAM_SHIFT"; continue; fi
@@ -62,6 +62,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ "$HOST" =~ ^[A-Za-z0-9._-]+$ ]] || die "Invalid host: $HOST"
+
+passthru_validate ${PASSTHRU[@]+"${PASSTHRU[@]}"} || exit 64
 
 # Probe the target the same way the launchers do, so the values we pass match
 # what the run will actually see.

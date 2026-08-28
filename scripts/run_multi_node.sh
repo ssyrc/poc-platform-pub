@@ -72,14 +72,14 @@ PASSTHRU=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --hosts)       HOST_SPECS+=("lit:${2:?}"); shift 2 ;;
-    --hosts-file)  HOST_SPECS+=("file:${2:?}"); shift 2 ;;
-    --version)     VERSION="${2:?}"; shift 2 ;;
-    --benchmark)   BENCHMARK="${2:?}"; shift 2 ;;
-    --gpu-type)    GPU_TYPE="${2:?}"; shift 2 ;;
-    --gpus)        GPUS="${2:?}"; shift 2 ;;
-    --master-port) MASTER_PORT_ARG="${2:?}"; shift 2 ;;
-    --run-id)      RUN_ID="${2:?}"; shift 2 ;;
+    --hosts)       HOST_SPECS+=("lit:${2:?--hosts needs a value}"); shift 2 ;;
+    --hosts-file)  HOST_SPECS+=("file:${2:?--hosts-file needs a value}"); shift 2 ;;
+    --version)     VERSION="${2:?--version needs a value}"; shift 2 ;;
+    --benchmark)   BENCHMARK="${2:?--benchmark needs a value}"; shift 2 ;;
+    --gpu-type)    GPU_TYPE="${2:?--gpu-type needs a value}"; shift 2 ;;
+    --gpus)        GPUS="${2:?--gpus needs a value}"; shift 2 ;;
+    --master-port) MASTER_PORT_ARG="${2:?--master-port needs a value}"; shift 2 ;;
+    --run-id)      RUN_ID="${2:?--run-id needs a value}"; shift 2 ;;
     -h|--help)     sed -n '4,44p' "$0"; train_params_help; exit 0 ;;
     *)
       if train_param_try "$1" "${2:-}"; then shift "$TRAIN_PARAM_SHIFT"; continue; fi
@@ -94,6 +94,8 @@ if [[ "${#HOST_SPECS[@]}" -eq 0 && -n "${MLPERF_HOSTFILE:-}" ]]; then
   echo "[INFO] using MLPERF_HOSTFILE=${MLPERF_HOSTFILE}"
 fi
 [[ "${#HOST_SPECS[@]}" -gt 0 ]] || die "--hosts or --hosts-file is required"
+
+passthru_validate ${PASSTHRU[@]+"${PASSTHRU[@]}"} || exit 64
 
 hosts_expand HOSTS "${HOST_SPECS[@]}" || exit 64
 

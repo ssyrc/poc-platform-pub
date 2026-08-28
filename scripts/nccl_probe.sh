@@ -71,12 +71,12 @@ PROBE_RDZV_TIMEOUT="${PROBE_RDZV_TIMEOUT:-90}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --host|--hosts) HOST_SPECS+=("lit:${2:?}"); shift 2 ;;
-    --hosts-file)   HOST_SPECS+=("file:${2:?}"); shift 2 ;;
-    --image)        IMAGE="${2:?}"; shift 2 ;;
-    --gpus)         GPUS="${2:?}"; shift 2 ;;
-    --master-addr)  MASTER_ADDR_ARG="${2:?}"; shift 2 ;;
-    --master-port)  MASTER_PORT="${2:?}"; shift 2 ;;
+    --host|--hosts) HOST_SPECS+=("lit:${2:?--host needs a value}"); shift 2 ;;
+    --hosts-file)   HOST_SPECS+=("file:${2:?--hosts-file needs a value}"); shift 2 ;;
+    --image)        IMAGE="${2:?--image needs a value}"; shift 2 ;;
+    --gpus)         GPUS="${2:?--gpus needs a value}"; shift 2 ;;
+    --master-addr)  MASTER_ADDR_ARG="${2:?--master-addr needs a value}"; shift 2 ;;
+    --master-port)  MASTER_PORT="${2:?--master-port needs a value}"; shift 2 ;;
     -h|--help) sed -n '4,45p' "$0"; exit 0 ;;
     *) die "Unknown argument: $1" ;;
   esac

@@ -38,8 +38,8 @@ HOST="localhost"
 IMAGE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --host)  HOST="${2:?}"; shift 2 ;;
-    --image) IMAGE="${2:?}"; shift 2 ;;
+    --host)  HOST="${2:?--host needs a value}"; shift 2 ;;
+    --image) IMAGE="${2:?--image needs a value}"; shift 2 ;;
     -h|--help) sed -n '4,29p' "$0"; exit 0 ;;
     *) die "Unknown argument: $1" ;;
   esac
