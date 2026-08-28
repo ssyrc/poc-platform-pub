@@ -290,6 +290,7 @@ if [[ -z "\$gpus" ]]; then
 fi
 [[ "\$gpus" =~ ^[0-9]+\$ && "\$gpus" -ge 1 ]] || { echo "[ERROR] no GPUs detected" >&2; exit 1; }
 echo "[REMOTE] node_rank=${node_rank} nproc_per_node=\$gpus starting torchrun at \$(date +%H:%M:%S)"
+echo "[LAUNCH] ${launch}"
 
 work="\$(mktemp -d)"
 trap 'rm -rf "\$work"' EXIT

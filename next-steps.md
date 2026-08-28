@@ -1,6 +1,6 @@
 # Next Steps
 
-- 갱신: 2026-08-28 (20회차)
+- 갱신: 2026-08-28 (21회차)
 - 상태: **2노드 학습 완주.** 8노드에서 `node27/29/30`이 all-reduce에 합류 못 함
 - 지금 할 일: rendezvous 격리(잔존 리스너 / 고유 id) 확인
 
@@ -85,39 +85,74 @@ echo "IMG=[$IMG] TAR=[$TAR]"     # 비어 있으면 조용히 죽습니다. 먼�
 
 ---
 
-## 5. 산수가 맞지 않았습니다 — 라운드가 두 개였습니다
+## 5. 확정된 사실 — rank 0이 혼자 완료했습니다
 
-`init_process_group`은 문제가 아닙니다. 거기까지 가지도 못합니다.
-
-```
-1. torchrun 에이전트가 rendezvous 완료      <- 실패 지점
-2. 워커(python) 시작
-3. 워커가 init_process_group 호출            <- [probe rN] 로그는 여기서
-```
-
-traceback이 `launcher/api.py:279 -> agent.run()`이었습니다. **에이전트 단계**라
-실패 노드에는 `[probe rN]` 줄이 아예 없습니다.
-
-**그리고 이 숫자가 맞지 않습니다.**
+2노드(`.28`, `.29`)로 좁힌 실행에서:
 
 ```
---nnodes=8  ->  min=max=8. 8개가 모여야 완료
-실제로는     ->  nranks 56 = 7노드가 완료되고 Destroy COMPLETE
+[.28] [probe r0..r7] all_reduce OK (= 8.0)     <- 8 ranks, 한 노드
+[.28] PARTICIPATING NODES
+        node-26052    8    0-7           <- 자기 혼자
+world formed: 8/16 ranks, 1/2 nodes
+
+[.29] recvValueWithTimeout failed ... remote=[node-26052]:29500
+      Connection was likely closed.
 ```
 
-7노드로는 8노드 rendezvous가 완료될 수 없습니다. **하나의 실행이 아니라는 뜻입니다.**
-`nranks 56`을 만든 라운드와 `.27`이 합류하려던 라운드가 **서로 다릅니다.**
+**`.28`이 `.29`를 기다리지 않고 혼자 world 8을 만들어 끝까지 돌았습니다.**
+`.29`는 그 뒤에 붙었고 store는 이미 사라진 뒤였습니다.
 
-그게 가능했던 이유:
+`init_process_group`도 문제가 아닙니다 — `.28`은 `init_process_group OK`까지 정상이고,
+`.29`의 스택은 `_PyRun_SimpleFileObject` → `PrefixStore::get`이라 **워커가 실행 중**이었습니다.
+즉 양쪽 다 rendezvous를 "완료"했는데 **서로 다른 world**를 만들었습니다.
 
-- 모든 실행이 rendezvous id **`none`을 공유** (이전 로그의 `rendezvous 'none'`)
-- 프로브는 `docker run --rm`을 **`--name` 없이** 씀 -> 중복 실행을 막는 것이 없음
+### 이게 왜 이상한가
 
-즉 **이전 실행의 컨테이너가 살아 있으면 같은 엔드포인트·같은 id의 별개 라운드가 겹칩니다.**
+```
+--nnodes=2  ->  min=max=2.  2개가 모여야 완료
+```
+
+**1노드로는 완료될 수 없습니다.** 로컬에서 생성되는 명령줄은 확인했고 정확합니다:
+
+```
+torchrun --nnodes=2 --node_rank=0 ...
+torchrun --nnodes=2 --node_rank=1 ...
+```
+
+그러니 **실제로 컨테이너에 전달된 명령줄이 이것과 다릅니다.** 그걸 봐야 합니다.
 
 ---
 
-## STEP 1 — rendezvous 격리 확인 (지금 할 일)
+## STEP 1 — 실제 실행된 명령줄 확인 (지금 할 일)
+
+**`git pull` 필요.** 호스트마다 `[LAUNCH]` 줄을 찍습니다.
+
+```bash
+./scripts/nccl_probe.sh --hosts node28,node29 --image $IMG 2>&1 | grep -E '\[LAUNCH\]|\[REMOTE\]'
+```
+
+두 줄이 나와야 합니다.
+
+```
+[node28] [LAUNCH] torchrun --nnodes=2 --node_rank=0 --nproc_per_node="$gpus" --rdzv_backend=c10d --rdzv-id=... --rdzv_endpoint=node28:29500 ...
+[node29] [LAUNCH] torchrun --nnodes=2 --node_rank=1 ...
+```
+
+**`--nnodes` 값이 2가 아니거나, `--rdzv-id`가 양쪽에서 다르거나, `--rdzv_endpoint`가
+다르면 거기가 원인입니다.**
+
+독립 확인 (docker가 실제로 받은 것):
+
+```bash
+for h in node28 node29; do
+  printf '%-16s ' "$h"
+  ssh $h "docker ps -a --format '{{.Command}}' | head -1"
+done
+```
+
+---
+
+## STEP 2 — rendezvous 격리 (참고)
 
 **`git pull` 필요.** 두 가지를 새로 봅니다.
 
