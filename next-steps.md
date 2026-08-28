@@ -1,6 +1,6 @@
 # Next Steps
 
-- 갱신: 2026-08-28 (16회차)
+- 갱신: 2026-08-28 (17회차)
 - 상태: 단일 노드 학습 통과 / 멀티노드 NCCL(IB) 통과 / **멀티노드 학습 재시도 단계**
 
 ---
@@ -12,7 +12,7 @@
 | 단일 노드 NCCL (1장 / 8장) | 통과 |
 | 단일 노드 학습 llama31_8b 8장 | **통과** |
 | 멀티노드 NCCL — Socket | 통과 (진단용, 쓰지 않음) |
-| 멀티노드 NCCL — **IB + GDR** | **통과** (ACS 해제 후) |
+| 멀티노드 NCCL — **IB + GDR** | **통과** |
 | 멀티노드 학습 | `npy_index` 문제로 실패 → **고침**, 재시도 필요 |
 
 ### 해결된 원인 세 가지
@@ -21,7 +21,7 @@
 |---|---|---|
 | `Unsupported precision bf16-mixed` | 8b `pretrain.py`는 `bf16`만 받음 | `d4a11f3` |
 | SIGSEGV (`ncclCommInitRankConfig`) | HPC-X `libnccl-net.so` ↔ NCCL 2.28.3 불일치 | `489dc11` — B300은 `NCCL_NET_PLUGIN=none` |
-| IB `status=4` (local protection error) | **PCIe ACS**가 NIC↔GPU P2P DMA 차단 | ACS 해제 (`acs_check.sh`) |
+| IB `status=4` (local protection error) | **PCIe ACS**가 NIC↔GPU P2P DMA 차단 | ACS 해제 — **완료** |
 
 ---
 
@@ -47,6 +47,14 @@ rank 0이 자기 노드에 인덱스를 만들고, 다른 노드 랭크들은 �
 ```
 
 `LOG_ROOT`가 노드-로컬이면 `MLPERF_NPY_INDEX_DIR`로 따로 지정하세요.
+
+### `NPY_INDEX_DIR` unbound variable
+
+위 수정에서 `mkdir` 줄이 `CONTAINER_CMD` 안, 즉 **컨테이너 내부**에 있었습니다.
+`NPY_INDEX_DIR`은 호스트 단계 변수라 컨테이너에는 없고, `set -u`에 걸렸습니다.
+
+컨테이너 안에서는 마운트 지점인 `/npy_index`를 쓰고, 호스트 쪽 디렉터리는
+`docker run` 전에 만들도록 고쳤습니다.
 
 ### 이미지 로드 순서 (`9e6a2c8`)
 
@@ -79,7 +87,7 @@ llama31_8b-pyt-blackwell.tar
 
 ## 준비
 
-**`git pull` 필요** (`5cbdc5b`).
+**`git pull` 필요** (`8578d78`).
 
 ```bash
 cd /mgmt/server/poc-platform/poc-platform-pub
@@ -93,19 +101,7 @@ TAR=/mgmt/server/poc-platform/data/dockerimgs/llama31_8b-pyt-blackwell.tar
 
 ---
 
-## STEP 1 — ACS 영구화 (아직 안 하셨다면)
-
-`setpci`로 끄셨다면 **재부팅하면 원복됩니다.** 긴 벤치마크 중 노드가 재부팅되면
-조용히 예전 증상으로 돌아갑니다. BIOS 설정이나 부팅 시 재적용 유닛으로 확정하세요.
-
-```bash
-./scripts/acs_check.sh --host $N1
-./scripts/acs_check.sh --host $N2
-```
-
----
-
-## STEP 2 — 멀티노드 학습 (PP=1, DP=2) ← 이걸 먼저
+## STEP 1 — 멀티노드 학습 (PP=1, DP=2)
 
 ```bash
 UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
@@ -128,7 +124,7 @@ MLPERF_TRAIN_IMAGE_TAR=$TAR \
 
 ---
 
-## STEP 3 — 단일 노드와 비교
+## STEP 2 — 단일 노드와 비교
 
 ```bash
 MLPERF_TRAIN_IMAGE_TAR=$TAR \
@@ -157,7 +153,7 @@ GBS가 128인 이유: 단일 노드는 DP=1이므로 스텝당 샘플 수가 2�
 PP=2로 가면 그게 거의 사라져서 **멀티노드 통신을 시험하는 구성이 아니게 됩니다.**
 PP는 모델이 안 들어갈 때 쓰는 카드이고, llama31_8b는 TP=8로 충분합니다.
 
-병렬화 전략 비교가 목적이면 STEP 2가 끝난 뒤에 돌려보세요.
+병렬화 전략 비교가 목적이면 STEP 1이 끝난 뒤에 돌려보세요.
 그때 `virtual_pipeline` 관련 에러가 나면 이렇게 넘깁니다. (런처는 PP=1일 때만
 자동으로 꺼줍니다.)
 
@@ -167,11 +163,10 @@ PP는 모델이 안 들어갈 때 쓰는 카드이고, llama31_8b는 TP=8로 충
 
 ---
 
-## STEP 4 — 회신
+## STEP 3 — 회신
 
-1. STEP 2 — 스텝이 도는지, `npy_index_dir`이 두 노드에서 같은지
-2. STEP 3 — 1노드 대비 2노드 스텝 시간
-3. ACS 영구화 방식
+1. STEP 1 — 스텝이 도는지, `npy_index_dir`이 두 노드에서 같은지
+2. STEP 2 — 1노드 대비 2노드 스텝 시간
 
 ---
 
@@ -180,7 +175,6 @@ PP는 모델이 안 들어갈 때 쓰는 카드이고, llama31_8b는 TP=8로 충
 | 항목 | 상태 |
 |---|---|
 | **SHARP 부재** | B300은 HPC-X 플러그인을 끄므로 in-network reduction 없음. 정식 측정 전에 이미지 교체 여부 결정 필요 |
-| **ACS 영구화** | `setpci`는 재부팅 시 원복 |
 | llama2_70b_lora | B300에서 아직 안 돌려봄. 8b가 끝나면 |
 | `NCCL_IB_DISABLE=1` 무시됨 | 진단 중 발견. 지금 막히는 건 없음, 원인 미상 |
 
@@ -199,6 +193,7 @@ PP는 모델이 안 들어갈 때 쓰는 카드이고, llama31_8b는 TP=8로 충
 | `14c29a1` | 로그 루트를 `.env`에서 지정 |
 | `c99e027`, `9e6a2c8` | 모든 노드 이미지 로드 완료 후 실행 |
 | `5cbdc5b` | **`npy_index`를 노드 간 공유** — 멀티노드 학습 |
+| `8578d78` | 그 수정의 `NPY_INDEX_DIR` unbound variable 수정 |
 
 ---
 

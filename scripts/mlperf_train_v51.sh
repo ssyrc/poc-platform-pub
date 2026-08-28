@@ -611,6 +611,10 @@ cleanup() {
 trap 'cleanup; emit_summary "stopped" 130 "stopped by signal"; exit 130' INT TERM HUP
 
 mkdir -p "$LOG_DIR"
+# Bind source for /npy_index, created here so the daemon does not have to.
+if [[ "$BENCHMARK" == "llama31_8b" ]]; then
+  mkdir -p "$NPY_INDEX_DIR"
+fi
 exec > >(tee -a "${LOG_DIR}/run.log") 2>&1
 
 echo "[PHASE] validate"
@@ -972,7 +976,7 @@ set -Eeuo pipefail
 trap '"'"'echo "[CONTAINER][FATAL] command failed at line ${LINENO}: ${BASH_COMMAND}" >&2'"'"' ERR
 
 cd "$BENCH_DIR"
-mkdir -p "$RESULT_DIR" "$NPY_INDEX_DIR"
+mkdir -p "$RESULT_DIR" /npy_index
 
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
