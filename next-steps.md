@@ -85,6 +85,38 @@ echo "IMG=[$IMG] TAR=[$TAR]"     # 비어 있으면 조용히 죽습니다. 먼�
 
 ---
 
+## 5. 산수가 맞지 않았습니다 — 라운드가 두 개였습니다
+
+`init_process_group`은 문제가 아닙니다. 거기까지 가지도 못합니다.
+
+```
+1. torchrun 에이전트가 rendezvous 완료      <- 실패 지점
+2. 워커(python) 시작
+3. 워커가 init_process_group 호출            <- [probe rN] 로그는 여기서
+```
+
+traceback이 `launcher/api.py:279 -> agent.run()`이었습니다. **에이전트 단계**라
+실패 노드에는 `[probe rN]` 줄이 아예 없습니다.
+
+**그리고 이 숫자가 맞지 않습니다.**
+
+```
+--nnodes=8  ->  min=max=8. 8개가 모여야 완료
+실제로는     ->  nranks 56 = 7노드가 완료되고 Destroy COMPLETE
+```
+
+7노드로는 8노드 rendezvous가 완료될 수 없습니다. **하나의 실행이 아니라는 뜻입니다.**
+`nranks 56`을 만든 라운드와 `.27`이 합류하려던 라운드가 **서로 다릅니다.**
+
+그게 가능했던 이유:
+
+- 모든 실행이 rendezvous id **`none`을 공유** (이전 로그의 `rendezvous 'none'`)
+- 프로브는 `docker run --rm`을 **`--name` 없이** 씀 -> 중복 실행을 막는 것이 없음
+
+즉 **이전 실행의 컨테이너가 살아 있으면 같은 엔드포인트·같은 id의 별개 라운드가 겹칩니다.**
+
+---
+
 ## STEP 1 — rendezvous 격리 확인 (지금 할 일)
 
 **`git pull` 필요.** 두 가지를 새로 봅니다.
