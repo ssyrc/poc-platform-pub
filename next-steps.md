@@ -87,7 +87,7 @@ llama31_8b-pyt-blackwell.tar
 
 ## 준비
 
-**`git pull` 필요** (`8578d78`).
+**`git pull` 필요** (`d916a99`).
 
 ```bash
 cd /mgmt/server/poc-platform/poc-platform-pub
@@ -193,7 +193,7 @@ PP는 모델이 안 들어갈 때 쓰는 카드이고, llama31_8b는 TP=8로 충
 | `14c29a1` | 로그 루트를 `.env`에서 지정 |
 | `c99e027`, `9e6a2c8` | 모든 노드 이미지 로드 완료 후 실행 |
 | `5cbdc5b` | **`npy_index`를 노드 간 공유** — 멀티노드 학습 |
-| `8578d78` | 그 수정의 `NPY_INDEX_DIR` unbound variable 수정 |
+| `d916a99` | 그 수정의 `NPY_INDEX_DIR` unbound variable 수정 |
 
 ---
 
