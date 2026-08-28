@@ -210,6 +210,7 @@ build_env_exports() {
     FP8_HYBRID \
     MASTER_ADDR \
     MASTER_PORT \
+    MLPERF_RDZV_TIMEOUT \
     NCCL_DEBUG \
     NCCL_IB_HCA \
     NCCL_SOCKET_IFNAME \
@@ -991,7 +992,11 @@ fi
 printf "[CONTAINER] command:"
 printf " %q" "${TORCHRUN_CMD[@]}"
 if [[ "${DGXNNODES}" -gt 1 ]]; then
-  TORCHRUN_ARGS=(--nnodes="$DGXNNODES" --node_rank="$MLPERF_NODE_RANK" --nproc_per_node="$MLPERF_NUM_GPUS" --rdzv_backend=c10d --rdzv_endpoint="${MASTER_ADDR}:${MASTER_PORT}")
+  # c10d's store read timeout defaults to 60s, independent of the rendezvous
+  # barrier. A node whose container starts slower than that has its store read
+  # cut short and never joins, leaving a world smaller than declared.
+  RDZV_TIMEOUT="${MLPERF_RDZV_TIMEOUT:-600}"
+  TORCHRUN_ARGS=(--nnodes="$DGXNNODES" --node_rank="$MLPERF_NODE_RANK" --nproc_per_node="$MLPERF_NUM_GPUS" --rdzv_backend=c10d --rdzv_endpoint="${MASTER_ADDR}:${MASTER_PORT}" --rdzv-conf="timeout=${RDZV_TIMEOUT},read_timeout=${RDZV_TIMEOUT}")
 else
   TORCHRUN_ARGS=(--standalone --nnodes=1 --nproc_per_node="$MLPERF_NUM_GPUS" --rdzv_backend=c10d --rdzv_endpoint="${MASTER_ADDR}:${MASTER_PORT}")
 fi
@@ -1083,6 +1088,7 @@ for env_name in \
   FP8_HYBRID \
   MASTER_ADDR \
   MASTER_PORT \
+  MLPERF_RDZV_TIMEOUT \
   NCCL_DEBUG \
   NCCL_IB_HCA \
   NCCL_SOCKET_IFNAME \

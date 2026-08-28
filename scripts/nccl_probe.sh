@@ -67,12 +67,17 @@ IMAGE=""
 GPUS=""
 MASTER_ADDR_ARG=""
 MASTER_PORT="${MASTER_PORT:-29500}"
-# How long rank 0 keeps accepting joiners. This is not only "how fast a missing
-# node is reported": it is also the window a slow node has to arrive in. Too
-# short and a node that is merely late gets its store connection closed
-# mid-join, which reads as a network fault rather than a race. Containers on a
-# cold node can take minutes to start, so this is generous by default and can
-# be lowered when a fast answer matters more.
+# How long a node may take to join, applied to both rendezvous knobs.
+#
+# c10d has two, and only setting one is why a node kept timing out at exactly
+# 60000ms after this was raised to 600: `timeout` bounds the rendezvous
+# barrier, while `read_timeout` bounds each read on the store socket and
+# defaults to 60s on its own. A node slower than that has its store read cut
+# short no matter how wide the barrier is, and reports a socket timeout --
+# which reads as a network fault rather than a slow start.
+#
+# Containers on a cold node can take minutes, so this is generous by default
+# and can be lowered when a fast answer matters more.
 PROBE_RDZV_TIMEOUT="${PROBE_RDZV_TIMEOUT:-600}"
 
 while [[ $# -gt 0 ]]; do
@@ -230,7 +235,7 @@ emit_remote() {
   if (( NNODES > 1 )); then
     # This is a pre-flight check, not a job worth waiting ten minutes on: cap
     # the join so a node that never arrives is reported in about a minute.
-    launch="torchrun --nnodes=${NNODES} --node_rank=${node_rank} --nproc_per_node=\"\$gpus\" --rdzv_backend=c10d --rdzv_endpoint=${MASTER_ADDR}:${MASTER_PORT} --rdzv-conf=timeout=${PROBE_RDZV_TIMEOUT}"
+    launch="torchrun --nnodes=${NNODES} --node_rank=${node_rank} --nproc_per_node=\"\$gpus\" --rdzv_backend=c10d --rdzv_endpoint=${MASTER_ADDR}:${MASTER_PORT} --rdzv-conf=timeout=${PROBE_RDZV_TIMEOUT},read_timeout=${PROBE_RDZV_TIMEOUT}"
   else
     launch="torchrun --standalone --nnodes=1 --nproc_per_node=\"\$gpus\""
   fi
