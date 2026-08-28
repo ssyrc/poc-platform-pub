@@ -1,80 +1,85 @@
 # Next Steps
 
-- 갱신: 2026-08-26 (15회차)
-- 상태: **IB 멀티노드 NCCL 통과.** 원인은 PCIe ACS였습니다
-- 이번 목표: 멀티노드 학습
+- 갱신: 2026-08-28 (16회차)
+- 상태: 단일 노드 학습 통과 / 멀티노드 NCCL(IB) 통과 / **멀티노드 학습 재시도 단계**
 
 ---
 
-## 1. 해결된 것
+## 1. 지금까지
 
-| | |
+| 단계 | 상태 |
 |---|---|
-| 원인 | **PCIe ACS**가 NIC↔GPU P2P DMA를 루트 컴플렉스로 우회시킴 |
-| 증상 | IB 멀티노드에서만 `status=4` (`IBV_WC_LOC_PROT_ERR`) |
-| 조치 | ACS 해제 |
-| 확인 | GDR 켠 상태로 IB 멀티노드 프로브 통과 |
+| 단일 노드 NCCL (1장 / 8장) | 통과 |
+| 단일 노드 학습 llama31_8b 8장 | **통과** |
+| 멀티노드 NCCL — Socket | 통과 (진단용, 쓰지 않음) |
+| 멀티노드 NCCL — **IB + GDR** | **통과** (ACS 해제 후) |
+| 멀티노드 학습 | `npy_index` 문제로 실패 → **고침**, 재시도 필요 |
 
-단일 노드·`ib_write_bw`·Socket이 전부 멀쩡했던 이유도 이걸로 설명됩니다.
-셋 다 **NIC가 GPU 메모리에 직접 접근하지 않는** 경로였습니다.
+### 해결된 원인 세 가지
+
+| 증상 | 원인 | 조치 |
+|---|---|---|
+| `Unsupported precision bf16-mixed` | 8b `pretrain.py`는 `bf16`만 받음 | `d4a11f3` |
+| SIGSEGV (`ncclCommInitRankConfig`) | HPC-X `libnccl-net.so` ↔ NCCL 2.28.3 불일치 | `489dc11` — B300은 `NCCL_NET_PLUGIN=none` |
+| IB `status=4` (local protection error) | **PCIe ACS**가 NIC↔GPU P2P DMA 차단 | ACS 해제 (`acs_check.sh`) |
 
 ---
 
-## 2. 멀티노드 학습 전에 두 가지
+## 2. 직전 라운드에서 고친 것
 
-### 2-1. ACS 영구화 — **지금 하세요**
-
-`setpci`로 끄셨다면 **재부팅하면 원복됩니다.**
-긴 벤치마크를 돌리다 노드가 재부팅되면 조용히 예전 증상으로 돌아갑니다.
-
-```bash
-# 현재 상태 재확인 (두 노드 다)
-./scripts/acs_check.sh --host $N1
-./scripts/acs_check.sh --host $N2
-```
-
-영구 조치는 둘 중 하나입니다.
-
-1. **BIOS에서 ACS 해제** — 권장. 보통 "ACS Enable" 또는 IOMMU 항목 아래
-2. **부팅 시 재적용하는 systemd 유닛** — BIOS 옵션이 없거나 재부팅 일정이 안 맞을 때
-
-측정 결과를 남기기 전에 **어느 쪽인지 확정**해 두세요.
-나중에 "그때는 됐는데" 가 되기 쉬운 종류의 설정입니다.
-
-### 2-2. 로그 경로 — 고쳤습니다
-
-**`git pull` 필요** (`14c29a1`).
-
-로그 루트가 네 스크립트 모두 `/opt/poc-platform/...`로 박혀 있었습니다.
-이제 `.env`에서 정합니다.
+### `npy_index` — 멀티노드 학습이 죽던 원인
 
 ```
-MLPERF_LOG_ROOT  >  POC_PLATFORM_ROOT  >  /opt/poc-platform
+FileNotFoundError: /npy_index/...-GPTDataset-train-document_index.npy
 ```
 
-**`POC_PLATFORM_ROOT`를 이미 `/mgmt/server/poc-platform`으로 두셨다면
-아무것도 안 하셔도 됩니다.** 로그가 알아서 따라갑니다.
+`/npy_index`가 `${LOG_DIR}/npy_index`에서 마운트되는데, `LOG_DIR`에는 **각 노드의
+타임스탬프와 호스트명**이 들어갑니다. 노드마다 다른 빈 디렉터리를 본 겁니다.
+rank 0이 자기 노드에 인덱스를 만들고, 다른 노드 랭크들은 빈 디렉터리를 읽었습니다.
+
+**PP=2 때문이 아닙니다.** PP=2가 NCCL을 지나 데이터셋 단계까지 간 첫 멀티노드
+실행이라 거기서 처음 드러난 것뿐이고, PP=1이어도 같은 에러가 났을 겁니다.
+
+이제 모든 노드가 같은 값을 받는 `RUN_ID`로 키를 잡습니다 (`5cbdc5b`).
 
 ```
-/mgmt/server/poc-platform/mlperf_logs_train_v51/...
+[INFO] npy_index_dir=${LOG_ROOT}/npy_index_${RUN_ID} (must be shared across nodes)
 ```
 
-따로 지정하려면 `.env`에 한 줄이면 됩니다.
+`LOG_ROOT`가 노드-로컬이면 `MLPERF_NPY_INDEX_DIR`로 따로 지정하세요.
 
-```bash
-MLPERF_LOG_ROOT=/mgmt/server/poc-platform
+### 이미지 로드 순서 (`9e6a2c8`)
+
+전에는 "tar가 있다"까지만 확인하고 넘어가서, N1이 `docker run`으로 들어간 뒤
+N2가 그제서야 tar를 풀었습니다. rendezvous가 그걸 기다려주지 않습니다.
+
+이제 **모든 노드에서 로드를 끝낸 뒤에** 실행합니다. 로드는 병렬입니다.
+
+```
+[INFO] preparing image on 2 host(s): <image>
+  node19: already loaded
+  node20: loaded from /mgmt/.../llama31_8b-pyt-blackwell.tar
+[INFO] image ready on all 2 host(s)
 ```
 
-각 suite가 자기 하위 디렉터리를 붙이므로(`mlperf_logs_train_v51`,
-`mlperf_logs_infer_v60` …) 루트 하나만 주시면 됩니다.
+### tar 파일명 (`6b421a6`)
 
-> **멀티노드에서 중요합니다.** 로그는 컨테이너를 띄운 **각 노드**에 쓰입니다.
-> 이 경로가 공유 스토리지면 한 실행의 로그가 한곳에 모입니다.
-> 디렉터리 이름에 호스트명이 들어가므로 노드끼리 충돌하지 않습니다.
+제가 문서에 언더스코어로 잘못 적었습니다. 하이픈이 맞습니다.
+
+```
+llama31_8b-pyt-blackwell.tar
+```
+
+### 로그 경로 (`14c29a1`)
+
+`.env`에서 지정합니다. `MLPERF_LOG_ROOT` > `POC_PLATFORM_ROOT` > `/opt/poc-platform`.
+`POC_PLATFORM_ROOT`가 이미 `/mgmt/...`면 아무것도 안 하셔도 따라갑니다.
 
 ---
 
 ## 준비
+
+**`git pull` 필요** (`5cbdc5b`).
 
 ```bash
 cd /mgmt/server/poc-platform/poc-platform-pub
@@ -88,27 +93,19 @@ TAR=/mgmt/server/poc-platform/data/dockerimgs/llama31_8b-pyt-blackwell.tar
 
 ---
 
-## STEP 1 — 데이터가 양쪽에 보이는지 (10초)
+## STEP 1 — ACS 영구화 (아직 안 하셨다면)
 
-멀티노드는 모든 노드가 같은 경로로 데이터를 봐야 합니다.
-
-```bash
-for h in $N1 $N2; do
-  echo "=== $h ==="
-  ssh $h 'ls /mgmt/server/poc-platform/data/training_llama31_8b/8b 2>&1 | head -3'
-  ssh $h "docker image inspect $IMG >/dev/null 2>&1 && echo '  image: OK' || echo '  image: MISSING'"
-done
-```
-
-이미지가 없는 노드가 있으면 먼저 올려두세요.
+`setpci`로 끄셨다면 **재부팅하면 원복됩니다.** 긴 벤치마크 중 노드가 재부팅되면
+조용히 예전 증상으로 돌아갑니다. BIOS 설정이나 부팅 시 재적용 유닛으로 확정하세요.
 
 ```bash
-ssh <노드> "docker load -i $TAR"
+./scripts/acs_check.sh --host $N1
+./scripts/acs_check.sh --host $N2
 ```
 
 ---
 
-## STEP 2 — 멀티노드 학습 (2노드 16 GPU)
+## STEP 2 — 멀티노드 학습 (PP=1, DP=2) ← 이걸 먼저
 
 ```bash
 UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
@@ -118,59 +115,63 @@ MLPERF_TRAIN_IMAGE_TAR=$TAR \
   --tp 8 --pp 1 --cp 1 --mbs 1 --gbs 256 --max-steps 10
 ```
 
-**GBS가 256인 이유**
-
-```
-WORLD = 8 GPU x 2 node = 16
-DP    = WORLD / (TP x PP x CP) = 16 / 8 = 2
-GBS는 MBS(1) x DP(2) = 2 의 배수
-GBS=256 -> grad_accum = 128
-```
-
-단일 노드(GBS=128, DP=1)와 **스텝당 샘플 수가 같아집니다.** 비교하려면 이 값이 맞습니다.
-
 **로그에서 확인할 것**
 
 ```
-[INFO] mode=multi nnodes=2 gpus_per_node=8 world_size_gpus=16
+[INFO] image ready on all 2 host(s)
 [INFO] parallel: TP=8 PP=1 CP=1 -> DP=2 (world=16)
 [INFO] batch:    MBS=1 GBS=256 grad_accum=128
-[INFO] rank0=... (MASTER_ADDR source)
-[INFO] log_dir=/mgmt/server/...        <- 새 경로가 맞는지
+[INFO] npy_index_dir=...        <- 두 노드에서 같은 경로여야 합니다
 [CONTAINER] B300: NCCL_NET_PLUGIN=none ...
 ++trainer.precision=bf16
-```
-
-런처가 자동으로 고른 RDMA 값도 같이 봐주세요. 프로브 때와 달라졌다면 그게 단서입니다.
-
-```
-NCCL_IB_HCA=...   NCCL_SOCKET_IFNAME=...
 ```
 
 ---
 
 ## STEP 3 — 단일 노드와 비교
 
-멀티노드가 돌면 스케일링을 봅니다. **여기서 SHARP 부재가 처음 수치로 드러납니다.**
-
 ```bash
-# 같은 조건 단일 노드 (비교 기준)
 MLPERF_TRAIN_IMAGE_TAR=$TAR \
 ./scripts/run_single_node.sh --host $N1 \
   --benchmark llama31_8b --docker-image $IMG \
   --tp 8 --pp 1 --mbs 1 --gbs 128 --max-steps 10
 ```
 
-스텝 시간을 비교하세요. 2노드가 1노드보다 **크게 느리면** 노드 간 통신이 병목입니다.
-그 경우 `NCCL_DEBUG=INFO`로 실제 경로가 IB인지(Socket으로 떨어지지 않았는지) 확인합니다.
+GBS가 128인 이유: 단일 노드는 DP=1이므로 스텝당 샘플 수가 2노드(GBS=256, DP=2)와
+같아집니다. **여기서 SHARP 부재가 처음 수치로 드러납니다.**
+
+---
+
+## PP=2에 대해
+
+**제약은 통과합니다.** `TP×PP×CP = 8×2×1 = 16 = WORLD` → `DP=1`, `grad_accum=256`.
+
+다만 **DP가 1이 됩니다.**
+
+| | 노드 간에 흐르는 것 |
+|---|---|
+| `PP=1, DP=2` | **gradient allreduce** — 대용량, 대역폭 위주 |
+| `PP=2, DP=1` | 파이프라인 activation P2P — 소량, 지연 위주 |
+
+방금 고친 IB/GDR 경로와 SHARP가 관여하는 지점이 **allreduce**입니다.
+PP=2로 가면 그게 거의 사라져서 **멀티노드 통신을 시험하는 구성이 아니게 됩니다.**
+PP는 모델이 안 들어갈 때 쓰는 카드이고, llama31_8b는 TP=8로 충분합니다.
+
+병렬화 전략 비교가 목적이면 STEP 2가 끝난 뒤에 돌려보세요.
+그때 `virtual_pipeline` 관련 에러가 나면 이렇게 넘깁니다. (런처는 PP=1일 때만
+자동으로 꺼줍니다.)
+
+```bash
+--extra-overrides "++model.virtual_pipeline_model_parallel_size=null"
+```
 
 ---
 
 ## STEP 4 — 회신
 
-1. STEP 2 — 스텝이 도는지, `log_dir`이 새 경로로 찍히는지
+1. STEP 2 — 스텝이 도는지, `npy_index_dir`이 두 노드에서 같은지
 2. STEP 3 — 1노드 대비 2노드 스텝 시간
-3. ACS를 BIOS로 영구화했는지 / systemd로 했는지
+3. ACS 영구화 방식
 
 ---
 
@@ -178,9 +179,10 @@ MLPERF_TRAIN_IMAGE_TAR=$TAR \
 
 | 항목 | 상태 |
 |---|---|
-| **SHARP 부재** | B300은 HPC-X 플러그인을 끄므로 in-network reduction 없음. 멀티노드 allreduce가 느립니다. 정식 측정 전에 이미지 교체 여부를 정해야 합니다 |
-| `NCCL_IB_DISABLE=1` 무시됨 | 진단 중 발견. 지금 막히는 건 없지만 원인 미상 |
-| llama2_70b_lora | 아직 B300에서 안 돌려봤습니다. 8b가 되면 그다음 |
+| **SHARP 부재** | B300은 HPC-X 플러그인을 끄므로 in-network reduction 없음. 정식 측정 전에 이미지 교체 여부 결정 필요 |
+| **ACS 영구화** | `setpci`는 재부팅 시 원복 |
+| llama2_70b_lora | B300에서 아직 안 돌려봄. 8b가 끝나면 |
+| `NCCL_IB_DISABLE=1` 무시됨 | 진단 중 발견. 지금 막히는 건 없음, 원인 미상 |
 
 ---
 
@@ -188,24 +190,19 @@ MLPERF_TRAIN_IMAGE_TAR=$TAR \
 
 | 커밋 | 내용 |
 |---|---|
-| `d4a11f3` | llama31_8b 정밀도 — `bf16-mixed` → `bf16` |
+| `d4a11f3` | llama31_8b 정밀도 `bf16-mixed` → `bf16` |
 | `19cad5e` | TP=1일 때 sequence parallelism 자동 해제 |
-| `76a7fc8` | `MLPERF_TRAIN_IMAGE_TAR`로 이미지에 맞는 tar 지정 |
-| `489dc11` | **B300에서 `NCCL_NET_PLUGIN=none`** — SIGSEGV 원인 해결 |
+| `76a7fc8` | `MLPERF_TRAIN_IMAGE_TAR` |
+| `489dc11` | **B300 `NCCL_NET_PLUGIN=none`** — SIGSEGV 해결 |
 | `a3d213a`, `2599300` | `nccl_probe.sh` — NCCL만 30초 검증, 단일/멀티 |
-| `a4fa8b6` | `acs_check.sh` — **IB 실패 원인 규명** |
-| `14c29a1` | 로그 루트를 `.env`에서 지정 가능하게 |
+| `a4fa8b6` | `acs_check.sh` — **IB `status=4` 원인 규명** |
+| `14c29a1` | 로그 루트를 `.env`에서 지정 |
+| `c99e027`, `9e6a2c8` | 모든 노드 이미지 로드 완료 후 실행 |
+| `5cbdc5b` | **`npy_index`를 노드 간 공유** — 멀티노드 학습 |
 
 ---
 
-## 확정된 사실 (기록용)
+## 참고 — 정리해두면 좋은 것
 
-| 항목 | 결과 |
-|---|---|
-| 단일 노드 학습 8장 | 통과 |
-| 멀티노드 NCCL (IB, GDR 켬) | **통과 — ACS 해제 후** |
-| IB 실패 원인 | **PCIe ACS**. `status=4` = local protection error |
-| SIGSEGV 원인 | HPC-X `libnccl-net.so` ↔ NCCL 2.28.3 불일치 |
-| 드라이버 | 580.173.02 (r580) — 정상 |
-| `ib_write_bw` | 호스트 메모리 기준이라 GDR 검증이 아니었음 |
-| 호스트 NCCL / HPC-X | 컨테이너와 무관 |
+`Errors`에 노드 IP, 호스트명, 사내 레지스트리 주소가 들어가 있습니다.
+이 저장소는 public입니다. 원하시면 익명화해 드리겠습니다.
