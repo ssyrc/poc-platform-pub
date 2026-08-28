@@ -75,3 +75,19 @@
 [node29] frame #25: __libc_start_main + 0x8b (0x7f41ba37928b in /lib/x86_64-linux-gnu/libc.so.6)
 [node29] frame #26: _start + 0x25 (0x656a35 in /usr/bin/python)
 [node29]
+
+
+
+
+====================================================================
+PER-HOST RESULT
+====================================================================
+  rank host                 exit   note
+  ----------------------------------------------------------------
+  0    node28         0      ok
+  1    node29         1      torch.distributed.DistNetworkError: Failed to recv, got 0 bytes. Connection was likely closed. Did t
+  ----------------------------------------------------------------
+  world formed: 8/16 ranks, 1/2 nodes
+  [FAIL] 8 rank(s) short -- the hosts above with a
+         non-zero exit are the ones that did not join
+====================================================================
