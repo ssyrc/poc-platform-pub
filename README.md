@@ -130,8 +130,18 @@ journalctl -u poc-platform-dev.service -f    # 또는 tail -f .poc_platform.log
 지정해, `poc-platform.service`(8100)가 쓰는 `.poc_platform_state/`(가속기별 성능·비용 분석 표 등)와
 **분리된 상태**로 동작합니다. dev에서 표를 편집해도 8100(운영)에는 영향을 주지 않습니다.
 (2026-08-13 이전에는 이 환경변수를 지정하지 않아 두 인스턴스가 상태를 공유했습니다 — 과거 히스토리는
-`HISTORY.md` 참고. `.poc_platform_dev_state/`가 아직 없다면 `.poc_platform_state/`를 복사해서
+`docs/HISTORY.md` 참고. `.poc_platform_dev_state/`가 아직 없다면 `.poc_platform_state/`를 복사해서
 시드 데이터로 써도 됩니다: `rsync -a .poc_platform_state/ .poc_platform_dev_state/`.)
+
+## 문서
+
+| 문서 | 내용 |
+|---|---|
+| [docs/start-platform.md](docs/start-platform.md) | 플랫폼 기동 + UI/API 테스트 순서 |
+| [docs/next-steps.md](docs/next-steps.md) | 현재 진행 상황과 다음 할 일 |
+| [docs/Errors.md](docs/Errors.md) | 실행 중 만난 에러 기록 |
+| [docs/HISTORY.md](docs/HISTORY.md), [docs/HISTORY2.md](docs/HISTORY2.md) | 작업 히스토리 |
+| [RELEASE_NOTES.md](RELEASE_NOTES.md) | 버전별 변경 사항 |
 
 ## 노드 세팅
 
@@ -180,5 +190,5 @@ scripts/
 디렉토리에 저장됩니다. 기본값은 `POC_PLATFORM_STATE_DIR` 환경변수가 없으면 `.poc_platform_state/`이며,
 이 경우 **같은 상위 폴더의 모든 배포본이 공유**합니다. `poc-platform-dev.service`는 이 환경변수를
 `.poc_platform_dev_state/`로 지정해 운영(latest, 8100)과 분리된 상태를 씁니다(위 "DEV/디버그 배포" 참고).
-자세한 내용과 오늘 작업 히스토리는 [`HISTORY.md`](./HISTORY.md) 참고.
+자세한 내용과 오늘 작업 히스토리는 [`docs/HISTORY.md`](docs/HISTORY.md) 참고.
 

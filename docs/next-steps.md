@@ -2,13 +2,13 @@
 
 - 갱신: 2026-08-28 (24회차)
 - 상태: 단일 노드·2노드 학습 통과 / 멀티노드 rendezvous는 **다른 분께 인계**
-- **지금 할 일: 플랫폼 기동 후 UI 로 end-to-end 테스트** → [docs/start-platform.md](docs/start-platform.md)
+- **지금 할 일: 플랫폼 기동 후 UI 로 end-to-end 테스트** → [start-platform.md](start-platform.md)
 
 ---
 
 ## 지금 할 일 — 플랫폼 띄우고 테스트
 
-가이드를 `docs/start-platform.md` 에 정리했습니다. 요약하면 이 순서입니다.
+가이드를 [`start-platform.md`](start-platform.md) 에 정리했습니다. 요약하면 이 순서입니다.
 
 ### 1. `.env`
 
@@ -179,7 +179,7 @@ MLPERF_TRAIN_IMAGE_TAR=$TAR \
 
 | 항목 | 상태 |
 |---|---|
-| 플랫폼 end-to-end 테스트 | **진행 중** (`docs/start-platform.md`) |
+| 플랫폼 end-to-end 테스트 | **진행 중** ([start-platform.md](start-platform.md)) |
 | 멀티노드 rendezvous | 미해결. **다른 분께 인계** |
 | SHARP 부재 | B300은 HPC-X 플러그인을 끄므로 in-network reduction 없음. 정식 측정 전 결정 필요 |
 | 스케일링 측정 | 1/2/4/8 스텝 시간 비교 (미착수) |
@@ -190,5 +190,5 @@ MLPERF_TRAIN_IMAGE_TAR=$TAR \
 
 ## 참고
 
-`Errors`에 노드 IP·호스트명·사내 레지스트리 주소가 들어가 있습니다.
+`Errors.md`에 노드 IP·호스트명·사내 레지스트리 주소가 들어가 있습니다.
 이 저장소는 public입니다. 원하시면 익명화해 드리겠습니다.
