@@ -1,93 +1,25 @@
-[node28] [probe r5] cuda:5 NVIDIA B300 SXM6 AC sm_103
-[node28] [probe r5] init_process_group(nccl) ...
-[node28] [probe r5] init_process_group OK
-[node28] [probe r7] all_reduce ...
-[node28] [probe r5] all_reduce ...
-[node28] [probe r1] all_reduce ...
-[node28] [probe r2] all_reduce ...
-[node28] [probe r0] all_reduce ...
-[node28] [probe r4] all_reduce ...
-[node28] [probe r6] all_reduce ...
-[node28] [probe r3] all_reduce ...
-[node28] [probe r7] all_reduce OK (= 8.0)
-[node28] [probe r1] all_reduce OK (= 8.0)
-[node28] [probe r4] all_reduce OK (= 8.0)
-[node28] [probe r6] all_reduce OK (= 8.0)
-[node28] [probe r2] all_reduce OK (= 8.0)
-[node28] [probe r0] all_reduce OK (= 8.0)
-[node28] [probe r3] all_reduce OK (= 8.0)
-[node28] [probe r5] all_reduce OK (= 8.0)
-[node28] /usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py:4814: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user.
-[node28]   warnings.warn(  # warn only once
-[node28] /usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py:4814: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user.
-[node28]   warnings.warn(  # warn only once
-[node28] /usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py:4814: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user.
-[node28]   warnings.warn(  # warn only once
-[node28] /usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py:4814: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user.
-[node28]   warnings.warn(  # warn only once
-[node28] /usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py:4814: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user.
-[node28]   warnings.warn(  # warn only once
-[node28] /usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py:4814: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user.
-[node28]   warnings.warn(  # warn only once
-[node28] /usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py:4814: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user.
-[node28]   warnings.warn(  # warn only once
-[node28] /usr/local/lib/python3.12/dist-packages/torch/distributed/distributed_c10d.py:4814: UserWarning: No device id is provided via `init_process_group` or `barrier `. Using the current device set by the user.
-[node28]   warnings.warn(  # warn only once
-[node28]
-[node28] ====================================================================
-[node28] PARTICIPATING NODES
-[node28] ====================================================================
-[node28]   node                         ranks    rank ids
-[node28]   ----------------------------------------------------------------
-[node28]   node-26052             8        0-7rectly, please report this to the maintainers of the package that installed pynvml for you.
-[node29]   import pynvml  # type: ignore[import]
-[node29] W0828 16:03:17.150000 1 torch/distributed/run.py:803]
-[node29] W0828 16:03:17.150000 1 torch/distributed/run.py:803] *****************************************
-[node29] W0828 16:03:17.150000 1 torch/distributed/run.py:803] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed.
-[node29] W0828 16:03:17.150000 1 torch/distributed/run.py:803] *****************************************
-[node29] [W828 16:03:57.174131656 TCPStore.cpp:138] [c10d] recvValueWithTimeout failed on SocketImpl(fd=45, addr=[node-26053]:49068, remote=[node-26052]:29500): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
-[node29] Exception raised from recvBytes at /opt/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:682 (most recent call first):
-[node29] frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x88 (0x7f4182b7fd98 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
-[node29] frame #1: <unknown function> + 0x5cd3cae (0x7f41a5e06cae in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
-[node29] frame #2: <unknown function> + 0x5cd4c10 (0x7f41a5e07c10 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
-[node29] frame #3: <unknown function> + 0x5cd5389 (0x7f41a5e08389 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
-[node29] frame #4: c10d::TCPStore::doWait(c10::ArrayRef<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::chrono::duration<long, std::ratio<1l, 1000l> >) + 0x1d5 (0x7f41a5e04395 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
-[node29] frame #5: c10d::TCPStore::doGet(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) + 0x33 (0x7f41a5e04723 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
-[node29] frame #6: c10d::TCPStore::get(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) + 0xab (0x7f41a5e0580b in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
-[node29] frame #7: c10d::PrefixStore::get(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) + 0x2f (0x7f41a5da1f3f in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
-[node29] frame #8: <unknown function> + 0xc954e6 (0x7f41ae3e34e6 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_python.so)
-[node29] frame #9: <unknown function> + 0x39787d (0x7f41adae587d in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_python.so)
-[node29] frame #10: /usr/bin/python() [0x581a6f]
-[node29] frame #11: _PyObject_MakeTpCall + 0x75 (0x5492f5 in /usr/bin/python)
-[node29] frame #12: _PyEval_EvalFrameDefault + 0xadf (0x5d68bf in /usr/bin/python)
-[node29] frame #13: _PyObject_Call_Prepend + 0xc2 (0x54ab42 in /usr/bin/python)
-[node29] frame #14: /usr/bin/python() [0x5a30c8]
-[node29] frame #15: PyObject_Call + 0x6c (0x54b47c in /usr/bin/python)
-[node29] frame #16: _PyEval_EvalFrameDefault + 0x4cb0 (0x5daa90 in /usr/bin/python)
-[node29] frame #17: PyEval_EvalCode + 0x15b (0x5d4dab in /usr/bin/python)
-[node29] frame #18: /usr/bin/python() [0x607fc2]
-[node29] frame #19: /usr/bin/python() [0x6b4393]
-[node29] frame #20: _PyRun_SimpleFileObject + 0x1aa (0x6b40fa in /usr/bin/python)
-[node29] frame #21: _PyRun_AnyFileObject + 0x4f (0x6b3f2f in /usr/bin/python)
-[node29] frame #22: Py_RunMain + 0x3b5 (0x6bbf45 in /usr/bin/python)
-[node29] frame #23: Py_BytesMain + 0x2d (0x6bba2d in /usr/bin/python)
-[node29] frame #24: <unknown function> + 0x2a1ca (0x7f41ba3791ca in /lib/x86_64-linux-gnu/libc.so.6)
-[node29] frame #25: __libc_start_main + 0x8b (0x7f41ba37928b in /lib/x86_64-linux-gnu/libc.so.6)
-[node29] frame #26: _start + 0x25 (0x656a35 in /usr/bin/python)
-[node29]
-
-
-
-
-====================================================================
-PER-HOST RESULT
-====================================================================
-  rank host                 exit   note
-  ----------------------------------------------------------------
-  0    node28         0      ok
-  1    node29         1      torch.distributed.DistNetworkError: Failed to recv, got 0 bytes. Connection was likely closed. Did t
-  ----------------------------------------------------------------
-  world formed: 8/16 ranks, 1/2 nodes
-  [FAIL] 8 rank(s) short -- the hosts above with a
-         non-zero exit are the ones that did not join
-====================================================================
+[root@node-26051 poc-platform-pub]# TORCH_DISTRIBUTED_DEBUG=DETAIL LOGLEVEL=INFO ./scripts/nccl_probe.sh --hosts node26,node27,node28,node29 --image $IMG 2>&1 | tee /mgmt/server/nccl_probe.log
+Warning: Permanently added 'node26' (ED25519) to the list of known hosts.
+[INFO] gpus_per_node=8 (detected on node26: NVIDIA B300 SXM6 AC)
+[INFO] B300 detected: NCCL_NET_PLUGIN=none (HPC-X plugin crashes ncclCommInitRankConfig)
+[INFO] mode=multi nnodes=4 hosts=node26 node27 node28 node29 gpus_per_node=8
+[INFO] rendezvous=node26:29500 (rank 0 = node26), join window 600s
+[INFO] image=registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell
+[INFO] env into container: PROBE_EXPECTED_WORLD=32 PROBE_EXPECTED_HOSTS=node26,node27,node28,node29 NCCL_NET_PLUGIN=none NCCL_IB_DISABLE= NCCL_IB_HCA= NCCL_SOCKET_IFNAME=
+[WARN] clocks differ by 45s across hosts (node29 .. node26)
+[WARN] not fatal -- runs succeed at this skew -- but worth fixing:
+[WARN]   chronyc makestep   on the hosts that are out
+[INFO] checking node26:29500 is reachable from every host
+  node26         ok (refused)  via local node26 dev lo src node26 uid 0
+  node27         ok (refused)  via node26 dev bond0.3061 src node27 uid 0
+  node28         ok (refused)  via node26 dev bond0.3061 src node28 uid 0
+  node29         ok (refused)  via node26 dev bond0.3061 src node29 uid 0
+[INFO] preparing image on 4 host(s): registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell
+  node26: already loaded
+  node27: already loaded
+  node28: already loaded
+  node29: already loaded
+[INFO] image ready on all 4 host(s)
+[node29] Warning: Permanently added 'node29' (ED25519) to the list of known hosts.
+[node29] [REMOTE] node_rank=3 nproc_per_node=8 starting torchrun at 01:22:40
+[node29] [LAUNCH] torchrun --nnodes=4 --node_rank=3 --nproc_per_node=8 --rdzv_backend=c10d --rdzv-id=probe_28846_1787934197 --rdzv_endpoint=node26:29500 --rdzv-conf=timeout=600,read_timeout=600
