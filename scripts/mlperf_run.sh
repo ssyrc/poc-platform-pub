@@ -507,6 +507,44 @@ RDMA_PROBE
     echo "[WARN] compute-net IP unavailable on rank 0; MASTER_ADDR falls back to host identifier: ${MASTER_HOST}"
   fi
 
+  # MASTER_ADDR is rank 0's compute-net address, which is not necessarily the
+  # address the hosts were named by. If the other nodes cannot route to it they
+  # never reach the rendezvous, rank 0 eventually gives up, and the run dies
+  # inside the container on a world size smaller than declared -- naming
+  # neither the address nor the hosts that could not use it.
+  echo "[PHASE] verify_master_reachable"
+  echo "[INFO] checking ${MASTER_HOST} is reachable from every host"
+  master_unreachable=0
+  for i in "${!HOSTS[@]}"; do
+    host="${HOSTS[$i]}"
+    if reach="$(cm_remote_bash "$host" "$MASTER_HOST" <<'REACH' 2>/dev/null
+target="$1"
+if command -v ping >/dev/null 2>&1 && ping -c1 -W2 "$target" >/dev/null 2>&1; then
+  echo ok; exit 0
+fi
+# ICMP is often filtered; a TCP handshake to sshd is a fair substitute.
+if timeout 3 bash -c "echo > /dev/tcp/${target}/22" >/dev/null 2>&1; then
+  echo ok; exit 0
+fi
+echo unreachable
+REACH
+)"; [[ "$(echo "$reach" | tail -1)" == "ok" ]]; then
+      echo "  ${host}: can reach ${MASTER_HOST}"
+    else
+      echo "  ${host}: [FAIL] cannot reach ${MASTER_HOST}" >&2
+      master_unreachable=1
+    fi
+  done
+  if (( master_unreachable )); then
+    echo >&2
+    echo "[ERROR] some hosts cannot reach the rendezvous address ${MASTER_HOST}." >&2
+    echo "[ERROR] They would never join, and the run would fail inside the" >&2
+    echo "[ERROR] container on a world size smaller than declared." >&2
+    echo "[ERROR] Set MASTER_ADDR to an address every host shares, or check" >&2
+    echo "[ERROR] that all hosts are on the same fabric." >&2
+    exit 64
+  fi
+
   echo "[PHASE] dispatch_multinode"
   echo "[INFO] node_mode=multi nnodes=${NNODES} gpus_per_node=${GPUS_PER_NODE} world_size_gpus=${WORLD_SIZE_GPUS} master=${MASTER_HOST}:${MASTER_PORT_VALUE}"
 
