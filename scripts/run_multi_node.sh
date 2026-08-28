@@ -171,11 +171,39 @@ export MLPERF_NODE_MODE="multi"
 export GPUS_PER_NODE="$GPUS"
 [[ -n "$MASTER_PORT_ARG" ]] && export MASTER_PORT="$MASTER_PORT_ARG"
 
-exec "${SCRIPT_DIR}/mlperf_run.sh" \
-  --run-id "$RUN_ID" \
-  --suite training \
-  --version "$VERSION" \
-  --benchmark "$BENCHMARK" \
-  --gpu-type "$GPU_TYPE" \
-  --hosts "$(IFS=,; echo "${HOSTS[*]}")" \
+RUN_CMD=(
+  "${SCRIPT_DIR}/mlperf_run.sh"
+  --run-id "$RUN_ID"
+  --suite training
+  --version "$VERSION"
+  --benchmark "$BENCHMARK"
+  --gpu-type "$GPU_TYPE"
+  --hosts "$(IFS=,; echo "${HOSTS[*]}")"
   ${PASSTHRU[@]+"${PASSTHRU[@]}"}
+)
+
+# Print it before running: when a run ends without visible output, the first
+# thing worth knowing is exactly what was invoked, so it can be rerun on its own.
+printf '[INFO] exec:'; printf ' %q' "${RUN_CMD[@]}"; printf '\n'
+
+# Deliberately not exec: replacing this shell means a launcher that exits
+# without printing anything leaves nothing behind either. Running it as a child
+# lets the status be reported, which is the difference between "it just ended"
+# and a number to work from.
+set +e
+"${RUN_CMD[@]}"
+rc=$?
+set -e
+
+if (( rc != 0 )); then
+  echo "[ERROR] mlperf_run.sh exited with status ${rc}" >&2
+  case "$rc" in
+    24) echo "[ERROR] (24 = image could not be obtained on some host)" >&2 ;;
+    64) echo "[ERROR] (64 = bad arguments)" >&2 ;;
+    69) echo "[ERROR] (69 = unsupported GPU/benchmark combination)" >&2 ;;
+    70) echo "[ERROR] (70 = invalid parallel configuration)" >&2 ;;
+  esac
+elif (( rc == 0 )); then
+  echo "[INFO] mlperf_run.sh finished with status 0"
+fi
+exit "$rc"
