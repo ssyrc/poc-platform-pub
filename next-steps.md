@@ -1,47 +1,41 @@
 # Next Steps
 
-- 갱신: 2026-08-28 (21회차)
+- 갱신: 2026-08-28 (22회차)
 - 상태: 단일 노드·2노드 학습 통과 / **멀티노드 rendezvous가 노드별로 따로 완료됨**
-- **지금 할 일: 각 호스트가 실제로 실행한 `[LAUNCH]` 줄 확인**
+- **지금 할 일: 버퍼링 수정 후 다시 돌려 전 노드 출력 확보**
 
 ---
 
 ## 지금 확정된 사실
 
-2노드(`.28`, `.29`)로 좁힌 실행:
+**`[LAUNCH]` 줄은 정상입니다.**
 
 ```
-[.28] [probe r0..r7] all_reduce OK (= 8.0)          <- 8 ranks, 한 노드
-      PARTICIPATING NODES: node-26052  8  0-7  <- 자기 혼자
-      world formed: 8/16 ranks, 1/2 nodes
-
-[.29] recvValueWithTimeout failed ... remote=[node-26052]:29500
-      Connection was likely closed.
+[.29] torchrun --nnodes=4 --node_rank=3 --nproc_per_node=8 \
+      --rdzv_backend=c10d --rdzv-id=probe_28846_1787934197 \
+      --rdzv_endpoint=node26:29500 --rdzv-conf=timeout=600,read_timeout=600
 ```
 
-**`.28`이 `.29`를 기다리지 않고 혼자 world 8을 만들어 끝까지 돌았습니다.**
-`.29`는 그 뒤에 붙었고 store는 이미 사라진 뒤였습니다.
+`--nnodes`, `--rdzv-id`, `--rdzv_endpoint` 모두 어긋난 곳이 없습니다.
 
-**`init_process_group`은 실패 지점이 아닙니다.** `.28`은 `init_process_group OK`까지
-정상이고, `.29`의 스택은 `_PyRun_SimpleFileObject` → `PrefixStore::get`이라
-**워커가 이미 실행 중**이었습니다. 양쪽 다 rendezvous를 "완료"했는데 world가 다릅니다.
+### 그런데 로그에 `.29` 것만 나왔습니다 — 그건 제 버그였습니다
 
-### 왜 불가능한가
+4노드 실행인데 `.26/.27/.28`은 **한 줄도** 안 나왔습니다. 그 노드들이 아무것도
+안 한 게 아니라, **출력이 `sed` 버퍼에 갇혀 있었습니다.**
 
-```
---nnodes=2  ->  min=max=2.  2개가 모여야 완료.  1노드로는 완료 불가
+```bash
+... | tee "${STATUS_DIR}/${i}.log" | sed "s/^/[${h}] /"     # -u 가 없었음
 ```
 
-스크립트가 생성하는 명령줄은 확인했고 정확합니다.
+`-u` 없는 `sed`는 stdout이 터미널이 아닐 때 **4KB 블록 버퍼링**을 합니다.
+`| tee nccl_probe.log`로 파이프하는 순간 그 조건이 됩니다. 여러 호스트가 동시에
+돌면 **"한 노드만 출력이 있다"**로 보이고, 그건 정확히 반대되는 결론입니다.
 
-```
-torchrun --nnodes=2 --node_rank=0 ...
-torchrun --nnodes=2 --node_rank=1 ...
-```
+`mlperf_run.sh`는 `sed -u`를 쓰는데 프로브만 빠져 있었습니다. 고쳤습니다.
 
-**그러니 컨테이너에 실제로 전달된 것이 이것과 다릅니다.** 그게 다음 단계입니다.
-
----
+> **주의:** 지금까지 **화면으로 본** "어느 노드가 참여했나"는 신뢰할 수 없습니다.
+> 다만 `${STATUS_DIR}/*.log`(호스트별 파일)와 `PER-HOST RESULT` 표는 `tee`가 직접
+> 쓴 것이라 정확합니다.
 
 ## 준비
 
@@ -56,55 +50,47 @@ echo "IMG=[$IMG] TAR=[$TAR]"     # 비어 있으면 조용히 죽습니다
 
 ---
 
-## STEP 1 — 실제 실행된 명령줄 (지금 할 일)
+## STEP 1 — 전 노드 출력 확보 (지금 할 일)
 
-```bash
-./scripts/nccl_probe.sh --hosts node28,node29 --image $IMG 2>&1 \
-  | grep -E '\[LAUNCH\]|\[REMOTE\]'
-```
-
-두 줄이 나옵니다.
-
-```
-[node28] [LAUNCH] torchrun --nnodes=2 --node_rank=0 --rdzv-id=... --rdzv_endpoint=...
-[node29] [LAUNCH] torchrun --nnodes=2 --node_rank=1 --rdzv-id=... --rdzv_endpoint=...
-```
-
-**볼 것 — 셋 중 하나라도 어긋나면 거기가 원인입니다.**
-
-| 항목 | 정상 |
-|---|---|
-| `--nnodes` | 양쪽 다 `2` |
-| `--rdzv-id` | 양쪽 **동일** |
-| `--rdzv_endpoint` | 양쪽 **동일**, rank 0의 주소 |
-
-제 로깅과 무관하게 독립 확인:
-
-```bash
-for h in node28 node29; do
-  printf '%-16s ' "$h"; ssh $h "docker ps -a --format '{{.Command}}' | head -1"
-done
-```
-
----
-
-## STEP 2 — 명령줄이 정상이면: rendezvous 내부 로그
-
-여기까지 오면 torch가 뭘 하는지 직접 봐야 합니다.
+**`git pull` 필요.** 이제 모든 호스트 출력이 즉시 나옵니다.
 
 ```bash
 TORCH_DISTRIBUTED_DEBUG=DETAIL LOGLEVEL=INFO \
-./scripts/nccl_probe.sh --hosts node28,node29 --image $IMG 2>&1 | tee /tmp/rdzv.log
+./scripts/nccl_probe.sh --hosts node26,node27,node28,node29 \
+  --image $IMG 2>&1 | tee /mgmt/server/nccl_probe.log
 ```
 
-볼 줄:
+**볼 것 — 이번엔 네 호스트 모두 나와야 합니다.**
+
+```
+[node26] [REMOTE] node_rank=0 ... starting torchrun at HH:MM:SS
+[node27] [REMOTE] node_rank=1 ...
+[node28] [REMOTE] node_rank=2 ...
+[node29] [REMOTE] node_rank=3 ...
+```
+
+시작 시각이 크게 벌어지는 노드가 있는지, 그리고 `TORCH_DISTRIBUTED_DEBUG=DETAIL`이
+찍는 rendezvous 줄이 노드마다 어떻게 다른지 보시면 됩니다.
 
 ```
 The node 'xxx' has joined round N of the rendezvous 'yyy' as rank R of W
 Rendezvous complete for workers. Result: restart_count=... master_addr=...
 ```
 
-`round`와 `rendezvous` id가 두 노드에서 같은지, `W`가 몇으로 나오는지가 답입니다.
+`round`·`W`가 노드마다 다르면 거기가 답입니다.
+
+---
+
+## STEP 2 — 그래도 안 되면: 2노드로 좁히기
+
+여기까지 오면 torch가 뭘 하는지 직접 봐야 합니다.
+
+rank 0과 문제 노드 하나만 남겨서, 로그를 끝까지 읽을 수 있게 합니다.
+
+```bash
+TORCH_DISTRIBUTED_DEBUG=DETAIL LOGLEVEL=INFO \
+./scripts/nccl_probe.sh --hosts node26,node27 --image $IMG 2>&1 | tee /tmp/rdzv.log
+```
 
 ---
 
@@ -119,7 +105,8 @@ Rendezvous complete for workers. Result: restart_count=... master_addr=...
 | 시계 skew | **정상 노드도 65s.** 검사는 경고로 완화 |
 | `read_timeout` 60s | 고침(`fdaa5c6`). 그래도 재현 |
 | 잔존 컨테이너 겹침 | `docker ps` 비어 있음 |
-| `init_process_group` | 실패 지점 아님 (위 참조) |
+| `init_process_group` | 실패 지점 아님 |
+| `[LAUNCH]` 인자 | `--nnodes`/`--rdzv-id`/`--rdzv_endpoint` 전부 정상 확인 |
 
 ---
 

@@ -334,7 +334,12 @@ for i in "${!HOSTS[@]}"; do
     # set +e, or pipefail would end this subshell the moment the pipeline
     # fails -- losing the exit status of exactly the hosts worth reporting.
     set +e
-    emit_remote "$i" | cm_remote_bash "$h" 2>&1 | tee "${STATUS_DIR}/${i}.log" | sed "s/^/[${h}] /"
+    # sed -u, not sed. Without it sed block-buffers whenever its stdout is not
+    # a terminal -- which it is not the moment anyone pipes this to tee -- so a
+    # host's output stays invisible until 4KB accumulates. With several hosts
+    # running at once that reads as "only one node produced anything", which is
+    # exactly the wrong conclusion to hand someone debugging a short world.
+    emit_remote "$i" | cm_remote_bash "$h" 2>&1 | tee "${STATUS_DIR}/${i}.log" | sed -u "s/^/[${h}] /"
     echo "${PIPESTATUS[1]}" > "${STATUS_DIR}/${i}"
   ) &
   PIDS+=("$!")
