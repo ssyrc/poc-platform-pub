@@ -1,4 +1,11 @@
 # 클러스터 1 에러 - hostfile에 8노드 지정함
+[INFO] image ready on all 8 host(s)
+[INFO] parallel: TP=8 PP=1 CP=1 -> DP=8 (world=64)
+[INFO] batch:    MBS=1 GBS=1024 grad_accum=128
+[INFO] overrides: MBS=1 GBS=1024 TP=8 PP=1 CP=1 MLPERF_MAX_STEPS=10
+[INFO] RDMA binding auto-detected per host (nvidia-smi topo -m + ibdev2netdev)
+
+
 [node25] ValueError: You set `devices=8` and `num_nodes=8` in Lightning, but the product (8 * 8) does not match the world size (56).
 [node25] Error executing job with overrides: ['++trainer.devices=8', '++trainer.num_nodes=8', '++trainer.max_steps=10', '++trainer.limit_val_batches=1', '++trainer.val_check_interval=10', '++trainer.log_every_n_steps=1', '++trainer.enable_progress_bar=true', '++trainer.precision=bf16', '++model.base_config=8b', '++model.tokenizer.model=/preproc_data/tokenizer', '++model.data.mock_dataset=false', '++model.tensor_model_parallel_size=8', '++model.pipeline_model_parallel_size=1', '++model.context_parallel_size=1', '++model.micro_batch_size=1', '++model.global_batch_size=1024', '++model.encoder_seq_length=8192', '++model.optim.lr=0.0008', '++model.optim.sched.warmup_steps=2', '++model.custom.target_log_ppl=3.3', '++model.fp8=False', '++model.fp8_hybrid=False', '++exp_manager.explicit_log_dir=/mgmt/server/poc-platform//mlperf_logs_train_v51/20260828_233106_node25_training_v5.1_llama31_8b_trainv51_multi_20260828_232713/results', '++model.virtual_pipeline_model_parallel_size=null']
 
@@ -9,7 +16,12 @@ MLPERF_TRAIN_IMAGE_TAR=$TAR \
   --benchmark llama31_8b --docker-image $IMG \
   --tp 8 --pp 1 --cp 1 --mbs 1 --gbs 384 --max-steps 10
 
-[node28] ^^You set `devices=8` and `num_nodes=3` in Lightning, but the product (8 * 3) does not match the world size (8).^^^
+[INFO] image ready on all 3 host(s)
+[INFO] parallel: TP=8 PP=1 CP=1 -> DP=3 (world=24)
+[INFO] batch:    MBS=1 GBS=384 grad_accum=128
+[INFO] overrides: MBS=1 GBS=384 TP=8 PP=1 CP=1 MLPERF_MAX_STEPS=10
+
+[node28] ^^^^ValueError^^^: ^^^You set `devices=8` and `num_nodes=3` in Lightning, but the product (8 * 3) does not match the world size (8).  File "/usr/local/lib/python3.12/dist-packages/lightning/fabric/plugins/environments/torchelastic.py", line 90, in validate_settings
 
 
 
