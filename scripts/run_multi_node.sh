@@ -140,6 +140,38 @@ echo "[INFO] mode=multi nnodes=${NNODES} gpus_per_node=${GPUS} world_size_gpus=$
 echo "[INFO] rank0=${FIRST} (MASTER_ADDR source) hosts=${HOSTS[*]}"
 echo "[INFO] version=${VERSION} benchmark=${BENCHMARK} gpu_type=${GPU_TYPE} run_id=${RUN_ID}"
 
+# GPUs per node is decided once and applied to every node: torchrun is given
+# the same --nproc_per_node everywhere, and Lightning is told devices x
+# num_nodes. A node that actually has a different count makes the world size
+# disagree with what was declared, and the run dies well after launch with
+#
+#   You set devices=8 and num_nodes=8 ... does not match the world size (56)
+#
+# naming no host. Check them all up front instead.
+echo "[INFO] verifying GPU count on ${NNODES} host(s)"
+gpu_mismatch=0
+for h in "${HOSTS[@]}"; do
+  n="$(cm_remote_bash "$h" <<<'nvidia-smi --query-gpu=index --format=csv,noheader 2>/dev/null | wc -l' 2>/dev/null | tail -1 | tr -dc '0-9')"
+  if [[ -z "$n" || "$n" == "0" ]]; then
+    echo "  ${h}: [FAIL] no GPUs visible (nvidia-smi returned nothing)" >&2
+    gpu_mismatch=1
+  elif [[ "$n" != "$GPUS" ]]; then
+    echo "  ${h}: [FAIL] ${n} GPUs, expected ${GPUS}" >&2
+    gpu_mismatch=1
+  else
+    echo "  ${h}: ${n} GPUs"
+  fi
+done
+if (( gpu_mismatch )); then
+  echo >&2
+  echo "[ERROR] hosts do not all have ${GPUS} GPUs; not starting the run." >&2
+  echo "[ERROR] every node must expose the same count, or the world size will" >&2
+  echo "[ERROR] not match devices x num_nodes. Fix the node, or pass --gpus <N>" >&2
+  echo "[ERROR] with a count every host can supply." >&2
+  exit 64
+fi
+
+
 # Every host must have the image loaded before any host starts a container --
 # see lib_image_prep.sh for why checking that a tar exists is not enough.
 #
