@@ -45,7 +45,7 @@ EOU
 
 die(){ echo "[ERROR] $*" >&2; exit 1; }
 MODE="run"; RUN_ID=""; GPU_TYPE=""; HOST=""; BENCHMARK="llama2_70b"; DOCKER_IMAGE=""
-MLPERF_ROOT="${MLPERF_ROOT:-${POC_PLATFORM_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}}"; DATA_ROOT="${MLPERF_DATA_ROOT:-${DATA_ROOT:-${MLPERF_ROOT}/data}}"; LOG_ROOT="/opt/poc-platform/mlperf_logs_infer_v51"; CONFIG_PATH=""; DRY_RUN="false"
+MLPERF_ROOT="${MLPERF_ROOT:-${POC_PLATFORM_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}}"; DATA_ROOT="${MLPERF_DATA_ROOT:-${DATA_ROOT:-${MLPERF_ROOT}/data}}"; LOG_ROOT="${MLPERF_LOG_ROOT:-${POC_PLATFORM_ROOT:-/opt/poc-platform}}/mlperf_logs_infer_v51"; CONFIG_PATH=""; DRY_RUN="false"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --stop) MODE="stop"; shift ;;

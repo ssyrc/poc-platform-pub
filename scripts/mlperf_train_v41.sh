@@ -65,7 +65,11 @@ BENCHMARK="llama2_70b_lora"
 DOCKER_IMAGE=""
 MLPERF_ROOT="${MLPERF_ROOT:-${POC_PLATFORM_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}}"
 DATA_ROOT="${MLPERF_DATA_ROOT:-${DATA_ROOT:-${MLPERF_ROOT}/data}}"
-LOG_ROOT="/opt/poc-platform/mlperf_logs_train_v41"
+# Where run logs are written, on the host that runs the container (the log dir
+# is bind-mounted into it at the same path). MLPERF_LOG_ROOT pins it outright;
+# otherwise it follows POC_PLATFORM_ROOT, so moving the platform moves its logs
+# with it. --log-root still overrides both.
+LOG_ROOT="${MLPERF_LOG_ROOT:-${POC_PLATFORM_ROOT:-/opt/poc-platform}}/mlperf_logs_train_v41"
 CONFIG_PATH=""
 DRY_RUN="false"
 
