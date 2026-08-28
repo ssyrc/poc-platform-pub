@@ -46,3 +46,4 @@
 [node20] [W828 13:50:46.380605784 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=44, addr=[node-26044]:38630, remote=[node-26043]:29500): Broken pipe
 [node20] Exception raised from sendBytes at /opt/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
 [node20] frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x88 (0x7f849317fd98 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+[node25] W0828 13:50:50.716000 1 torch/distributed/elastic/rendezvous/dynamic_rendezvous.py:1292] The node 'node-26049_1_0' has failed to shutdown the rendezvous 'none' due to an error of type RendezvousConnectionError.
