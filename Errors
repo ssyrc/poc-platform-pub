@@ -34,40 +34,17 @@
 [node14] frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std:           :char_traits<char>, std::allocator<char> >) + 0x88 (0x7f58b2a63d98 in /usr/local/lib/python3.12/dist-           packages/torch/lib/libc10.so)
 
 
-# 클러스터 2 에러
-[node19]     raise RendezvousTimeoutError
-[node19] torch.distributed.elastic.rendezvous.api.RendezvousTimeoutError
-[node20] [W828 13:50:46.374831727 TCPStore.cpp:138] [c10d] recvValueWithTimeout failed on SocketImpl(fd=44, addr=[node-26044]:38630, remote=[node-26043]:29500): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
-[node20] Exception raised from recvBytes at /opt/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:682 (most recent call first):
-[node20] frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x88 (0x7f849317fd98 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
-[node20] frame #1: <unknown function> + 0x5cd3cae (0x7f84b6406cae in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
-[node20] frame #2: <unknown function> + 0x5cd4c10 (0x7f84b6407c10 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
-[node20] frame #3: <unknown function> + 0x5cd5389 (0x7f84b6408389 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
-[node20] frame #4: c10d::TCPStore::doWait(c10::ArrayRef<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::chrono::duration<long, std::ratio<1l, 1000l> >) + 0x1d5 (0x7f84b6404395 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
-[node20] frame #5: c10d::TCPStore::doGet(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) + 0x33 (0x7f84b6404723 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
-[node20] frame #6: c10d::TCPStore::get(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) + 0xab (0x7f84b640580b in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
-[node20] frame #7: <unknown function> + 0xc954e6 (0x7f84be9e34e6 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_python.so)
-[node20] frame #8: <unknown function> + 0x39787d (0x7f84be0e587d in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_python.so)
-[node20] frame #9: /usr/bin/python() [0x581a6f]
-[node20] frame #10: _PyObject_MakeTpCall + 0x75 (0x5492f5 in /usr/bin/python)
-[node20] frame #11: /usr/bin/python() [0x54d017]
-[node20] frame #12: _PyEval_EvalFrameDefault + 0x4cb0 (0x5daa90 in /usr/bin/python)
-[node20] frame #13: _PyObject_Call_Prepend + 0xc2 (0x54ab42 in /usr/bin/python)
-[node20] frame #14: /usr/bin/python() [0x5a30c8]
-[node20] frame #15: PyObject_Call + 0x6c (0x54b47c in /usr/bin/python)
-[node20] frame #16: _PyEval_EvalFrameDefault + 0x4cb0 (0x5daa90 in /usr/bin/python)
-[node20] frame #17: PyEval_EvalCode + 0x15b (0x5d4dab in /usr/bin/python)
-[node20] frame #18: /usr/bin/python() [0x607fc2]
-[node20] frame #19: /usr/bin/python() [0x6b4393]
-[node20] frame #20: _PyRun_SimpleFileObject + 0x1aa (0x6b40fa in /usr/bin/python)
-[node20] frame #21: _PyRun_AnyFileObject + 0x4f (0x6b3f2f in /usr/bin/python)
-[node20] frame #22: Py_RunMain + 0x3b5 (0x6bbf45 in /usr/bin/python)
-[node20] frame #23: Py_BytesMain + 0x2d (0x6bba2d in /usr/bin/python)
-[node20] frame #24: <unknown function> + 0x2a1ca (0x7f84ca9a31ca in /lib/x86_64-linux-gnu/libc.so.6)
-[node20] frame #25: __libc_start_main + 0x8b (0x7f84ca9a328b in /lib/x86_64-linux-gnu/libc.so.6)
-[node20] frame #26: _start + 0x25 (0x656a35 in /usr/bin/python)
-[node20]
-[node20] [W828 13:50:46.380605784 TCPStore.cpp:106] [c10d] sendBytes failed on SocketImpl(fd=44, addr=[node-26044]:38630, remote=[node-26043]:29500): Broken pipe
-[node20] Exception raised from sendBytes at /opt/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:653 (most recent call first):
-[node20] frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x88 (0x7f849317fd98 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
-[node25] W0828 13:50:50.716000 1 torch/distributed/elastic/rendezvous/dynamic_rendezvous.py:1292] The node 'node-26049_1_0' has failed to shutdown the rendezvous 'none' due to an error of type RendezvousConnectionError.
+# 멀티노드 실행 에러
+[root@node-26051 poc-platform-pub]# UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
+MLPERF_TRAIN_IMAGE_TAR=$TAR \
+./scripts/run_multi_node.sh --hosts $HOSTS \
+  --benchmark llama31_8b --docker-image $IMG \
+  --tp 8 --pp 1 --cp 1 --mbs 1 --gbs 1024 --max-steps 10
+Warning: Permanently added 'node11' (ED25519) to the list of known hosts.
+[INFO] mode=multi nnodes=8 gpus_per_node=8 world_size_gpus=64
+[INFO] rank0=node11 (MASTER_ADDR source) hosts=node11 node12 node13 node14 node15 node16 node17 node18
+[INFO] version=v5.1 benchmark=llama31_8b gpu_type=B300 run_id=trainv51_multi_20260828_230901
+[INFO] parallel: TP=8 PP=1 CP=1 -> DP=8 (world=64)
+[INFO] batch:    MBS=1 GBS=1024 grad_accum=128
+[INFO] overrides: MBS=1 GBS=1024 TP=8 PP=1 CP=1 MLPERF_MAX_STEPS=10
+[INFO] RDMA binding auto-detected per host (nvidia-smi topo -m + ibdev2netdev)
