@@ -57,6 +57,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/lib_hosts.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib_image_prep.sh"
 
 die() { echo "[ERROR] $*" >&2; exit 1; }
 
@@ -65,6 +67,7 @@ IMAGE=""
 GPUS=""
 MASTER_ADDR_ARG=""
 MASTER_PORT="${MASTER_PORT:-29500}"
+PROBE_RDZV_TIMEOUT="${PROBE_RDZV_TIMEOUT:-90}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -156,6 +159,11 @@ else
   echo "[INFO] env into container: <none>"
 fi
 
+# A host whose docker run fails never joins, and the others then sit in the
+# rendezvous until rank 0 gives up -- reported as RendezvousTimeoutError and
+# broken pipes, naming nobody. Load the image everywhere first.
+image_prep_hosts "$IMAGE" "${MLPERF_TRAIN_IMAGE_TAR:-}" "${HOSTS[@]}" || exit 24
+
 PROBE_B64="$(base64 -w0 < "${SCRIPT_DIR}/nccl_probe.py")"
 
 # One node: torchrun --standalone, no rendezvous, exactly as before.
@@ -164,7 +172,9 @@ PROBE_B64="$(base64 -w0 < "${SCRIPT_DIR}/nccl_probe.py")"
 emit_remote() {
   local node_rank="$1" launch
   if (( NNODES > 1 )); then
-    launch="torchrun --nnodes=${NNODES} --node_rank=${node_rank} --nproc_per_node=\"\$gpus\" --rdzv_backend=c10d --rdzv_endpoint=${MASTER_ADDR}:${MASTER_PORT}"
+    # This is a pre-flight check, not a job worth waiting ten minutes on: cap
+    # the join so a node that never arrives is reported in about a minute.
+    launch="torchrun --nnodes=${NNODES} --node_rank=${node_rank} --nproc_per_node=\"\$gpus\" --rdzv_backend=c10d --rdzv_endpoint=${MASTER_ADDR}:${MASTER_PORT} --rdzv-conf=timeout=${PROBE_RDZV_TIMEOUT}"
   else
     launch="torchrun --standalone --nnodes=1 --nproc_per_node=\"\$gpus\""
   fi

@@ -56,6 +56,8 @@ source "${SCRIPT_DIR}/common.sh"
 source "${SCRIPT_DIR}/lib_train_params.sh"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/lib_hosts.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib_image_prep.sh"
 
 die() { echo "[ERROR] $*" >&2; exit 1; }
 
@@ -136,19 +138,12 @@ echo "[INFO] mode=multi nnodes=${NNODES} gpus_per_node=${GPUS} world_size_gpus=$
 echo "[INFO] rank0=${FIRST} (MASTER_ADDR source) hosts=${HOSTS[*]}"
 echo "[INFO] version=${VERSION} benchmark=${BENCHMARK} gpu_type=${GPU_TYPE} run_id=${RUN_ID}"
 
-# Every host must have the image *loaded* before any host starts a container.
-# Checking that a tar exists is not enough: the run would begin, the hosts that
-# already have the image would launch and enter the rendezvous, and a host still
-# unpacking a tens-of-gigabytes tar would not arrive before the rendezvous times
-# out. So load it here, on every host that needs it, and wait for all of them.
-#
-# Loads run in parallel -- one after another would be the size of the tar times
-# the number of nodes.
+# Every host must have the image loaded before any host starts a container --
+# see lib_image_prep.sh for why checking that a tar exists is not enough.
 #
 # Only what this wrapper knows is handled: the image when --docker-image was
 # given, and the tar when MLPERF_TRAIN_IMAGE_TAR was. Picking the default image
-# depends on gpu type and benchmark and stays the launcher's job. Nothing is
-# copied between machines; each host loads from a tar it can already read.
+# depends on gpu type and benchmark and stays the launcher's job.
 USER_IMAGE=""
 for i in "${!PASSTHRU[@]}"; do
   if [[ "${PASSTHRU[$i]}" == "--docker-image" ]]; then
@@ -158,91 +153,7 @@ for i in "${!PASSTHRU[@]}"; do
 done
 
 if [[ -n "$USER_IMAGE" || -n "${MLPERF_TRAIN_IMAGE_TAR:-}" ]]; then
-  echo "[INFO] preparing image on ${NNODES} host(s): ${USER_IMAGE:-<launcher default>}"
-  IMG_STATUS_DIR="$(mktemp -d)"
-  trap 'rm -rf "$IMG_STATUS_DIR"' EXIT
-
-  for i in "${!HOSTS[@]}"; do
-    h="${HOSTS[$i]}"
-    (
-      out="$(cm_remote_bash "$h" <<PREP 2>&1
-set -uo pipefail
-img="${USER_IMAGE}"
-tar="${MLPERF_TRAIN_IMAGE_TAR:-}"
-dirs="${POC_PLATFORM_DOCKERIMG_DIRS:-}"
-
-if [[ -n "\$img" ]] && docker image inspect "\$img" >/dev/null 2>&1; then
-  echo "PRESENT"; exit 0
-fi
-
-# Same basename search the launchers do, for hosts that mount the staging
-# area somewhere else.
-found=""
-[[ -n "\$tar" && -r "\$tar" ]] && found="\$tar"
-if [[ -z "\$found" && -n "\$tar" && -n "\$dirs" ]]; then
-  base="\$(basename "\$tar")"
-  IFS=':' read -ra dd <<< "\$dirs"
-  for d in "\${dd[@]}"; do
-    [[ -n "\$d" && -r "\${d}/\${base}" ]] && { found="\${d}/\${base}"; break; }
-  done
-fi
-[[ -n "\$found" ]] || { echo "NOTAR"; exit 0; }
-
-load_out="\$(docker load -i "\$found" 2>&1)" || { echo "\$load_out"; echo "LOADFAIL"; exit 0; }
-
-if [[ -n "\$img" ]] && docker image inspect "\$img" >/dev/null 2>&1; then
-  echo "LOADED \$found"; exit 0
-fi
-# The tag inside the tar need not match the one the launcher will ask for.
-ref="\$(echo "\$load_out" | awk -F': ' '/Loaded image:/ {print \$2}' | tail -n 1)"
-if [[ -n "\$img" && -n "\$ref" ]]; then
-  docker tag "\$ref" "\$img" >/dev/null 2>&1 || true
-  docker image inspect "\$img" >/dev/null 2>&1 && { echo "LOADED \$found"; exit 0; }
-fi
-echo "TAGMISS \${ref:-<none>}"
-PREP
-)"
-      printf '%s' "$out" > "${IMG_STATUS_DIR}/${i}.out"
-      printf '%s' "$(printf '%s' "$out" | tail -1 | tr -d '\r')" > "${IMG_STATUS_DIR}/${i}"
-    ) &
-  done
-
-  # No host may start until every load has finished.
-  wait
-
-  image_fail=0
-  for i in "${!HOSTS[@]}"; do
-    h="${HOSTS[$i]}"
-    verdict="$(cat "${IMG_STATUS_DIR}/${i}" 2>/dev/null || echo "")"
-    case "$verdict" in
-      PRESENT)  echo "  ${h}: already loaded" ;;
-      LOADED*)  echo "  ${h}: loaded from ${verdict#LOADED }" ;;
-      NOTAR)
-        echo "  ${h}: [FAIL] no image, and no readable tar on this host" >&2
-        echo "         looked for: ${MLPERF_TRAIN_IMAGE_TAR:-<none>}" >&2
-        image_fail=1 ;;
-      LOADFAIL)
-        echo "  ${h}: [FAIL] docker load failed" >&2
-        sed 's/^/         /' "${IMG_STATUS_DIR}/${i}.out" >&2
-        image_fail=1 ;;
-      TAGMISS*)
-        echo "  ${h}: [FAIL] tar loaded ${verdict#TAGMISS } but ${USER_IMAGE} is still missing" >&2
-        image_fail=1 ;;
-      *)
-        echo "  ${h}: [FAIL] unexpected result: ${verdict:-<empty>}" >&2
-        sed 's/^/         /' "${IMG_STATUS_DIR}/${i}.out" 2>/dev/null >&2
-        image_fail=1 ;;
-    esac
-  done
-
-  if (( image_fail )); then
-    echo >&2
-    echo "[ERROR] not every host has the image; not starting the run." >&2
-    echo "[ERROR] stage the tar where the host can read it, or point" >&2
-    echo "[ERROR] POC_PLATFORM_DOCKERIMG_DIRS at a directory it is in." >&2
-    exit 24
-  fi
-  echo "[INFO] image ready on all ${NNODES} host(s)"
+  image_prep_hosts "$USER_IMAGE" "${MLPERF_TRAIN_IMAGE_TAR:-}" "${HOSTS[@]}" || exit 24
 fi
 
 # Multi node: world size spans every rank, so TP x PP x CP may exceed one node.
