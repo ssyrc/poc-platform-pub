@@ -26,10 +26,15 @@ set -Eeuo pipefail
 #   run_multi_node.sh --hosts 192.0.2.41,192.0.2.42
 #   run_multi_node.sh --hosts 192.0.2.41,192.0.2.42 --gpus 8 --dry-run
 #   run_multi_node.sh --hosts node1,node2,node3 --version v4.1
+#   run_multi_node.sh --hosts-file hostfile
 #
 # Options:
 #   --hosts a,b,c        hostnames or IPs, comma-separated. Order sets rank:
 #                        the first entry is rank 0 and hosts MASTER_ADDR.
+#   --hosts-file <path>  one host per line; '#' comments and blank lines are
+#                        ignored. Repeatable, and combinable with --hosts --
+#                        they expand in the order given. Defaults to
+#                        MLPERF_HOSTFILE when neither flag is passed.
 #   --version            v4.1 | v5.1                  (default: v5.1)
 #   --benchmark          default: llama2_70b_lora
 #   --gpu-type           default: detected on the first host
@@ -49,10 +54,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/lib_train_params.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib_hosts.sh"
 
 die() { echo "[ERROR] $*" >&2; exit 1; }
 
-HOSTS_RAW=""
+HOST_SPECS=()
 VERSION="v5.1"
 BENCHMARK="llama2_70b_lora"
 GPU_TYPE=""
@@ -63,7 +70,8 @@ PASSTHRU=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --hosts)       HOSTS_RAW="${2:?}"; shift 2 ;;
+    --hosts)       HOST_SPECS+=("lit:${2:?}"); shift 2 ;;
+    --hosts-file)  HOST_SPECS+=("file:${2:?}"); shift 2 ;;
     --version)     VERSION="${2:?}"; shift 2 ;;
     --benchmark)   BENCHMARK="${2:?}"; shift 2 ;;
     --gpu-type)    GPU_TYPE="${2:?}"; shift 2 ;;
@@ -77,17 +85,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "$HOSTS_RAW" ]] || die "--hosts is required (comma-separated hostnames or IPs)"
+# MLPERF_HOSTFILE lets a fixed cluster be described once in .env instead of on
+# every command line.
+if [[ "${#HOST_SPECS[@]}" -eq 0 && -n "${MLPERF_HOSTFILE:-}" ]]; then
+  HOST_SPECS+=("file:${MLPERF_HOSTFILE}")
+  echo "[INFO] using MLPERF_HOSTFILE=${MLPERF_HOSTFILE}"
+fi
+[[ "${#HOST_SPECS[@]}" -gt 0 ]] || die "--hosts or --hosts-file is required"
 
-HOSTS=()
-IFS=',' read -ra _parts <<< "$HOSTS_RAW"
-for h in "${_parts[@]}"; do
-  h="$(echo "$h" | xargs)"
-  [[ -n "$h" ]] || continue
-  # Same character set mlperf_run.sh accepts; IPv4 passes as-is.
-  [[ "$h" =~ ^[A-Za-z0-9._-]+$ ]] || die "Invalid host: $h"
-  HOSTS+=("$h")
-done
+hosts_expand HOSTS "${HOST_SPECS[@]}" || exit 64
 
 [[ "${#HOSTS[@]}" -ge 2 ]] || die "multi-node needs at least two hosts (got ${#HOSTS[@]}). Use run_single_node.sh for one."
 

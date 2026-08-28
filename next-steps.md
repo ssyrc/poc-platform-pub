@@ -105,11 +105,37 @@ TAR=/mgmt/server/poc-platform/data/dockerimgs/llama31_8b-pyt-blackwell.tar
 
 8개를 커맨드라인에 나열하면 실수하기 쉬우니 변수로 둡니다.
 
+8개를 매번 나열하지 않도록 `--hosts-file`을 쓰시면 됩니다. 한 줄에 하나입니다.
+
 ```bash
-HOSTS=node19,node20,<노드3>,<노드4>,<노드5>,<노드6>,<노드7>,<노드8>
+cat > hostfile <<'EOS'
+# rack 3
+node19
+node20
+<노드3>
+<노드4>
+<노드5>
+<노드6>
+<노드7>
+<노드8>
+EOS
 ```
 
-`--hosts`의 **순서가 rank를 정합니다.** 첫 번째가 rank 0이고 `MASTER_ADDR`가 됩니다.
+**순서가 rank를 정합니다.** 첫 줄이 rank 0이고 `MASTER_ADDR`가 됩니다.
+`#` 뒤와 빈 줄은 무시되고, 콤마·여분 공백·CRLF도 알아서 처리합니다.
+
+```bash
+./scripts/nccl_probe.sh     --hosts-file hostfile --image $IMG
+./scripts/run_multi_node.sh --hosts-file hostfile ...
+```
+
+`.env`에 `MLPERF_HOSTFILE=/path/to/hostfile`를 두면 플래그 없이도 읽습니다.
+`--hosts`와 섞어 쓸 수도 있고, 그때는 **적은 순서대로** 이어집니다.
+아래 예시는 편의상 변수로 씁니다.
+
+```bash
+HOSTS=$(paste -sd, hostfile)
+```
 
 ---
 

@@ -24,12 +24,15 @@ set -Eeuo pipefail
 #   nccl_probe.sh --host 192.0.2.41 --image <repo:tag>
 #   nccl_probe.sh --host 192.0.2.41 --image <repo:tag> --gpus 2
 #   nccl_probe.sh --hosts 192.0.2.41,192.0.2.42 --image <repo:tag>
+#   nccl_probe.sh --hosts-file hostfile --image <repo:tag>
 #   NCCL_MNNVL_ENABLE=0 nccl_probe.sh --host ... --image ...
 #
 # Options:
 #   --host <host|ip>   single target (default: localhost)
 #   --hosts a,b,c      several targets, one distributed job. Order sets rank:
 #                      the first entry is rank 0 and hosts the rendezvous.
+#   --hosts-file <p>   one host per line; '#' comments and blanks ignored.
+#                      Defaults to MLPERF_HOSTFILE when no host flag is given.
 #   --image <ref>      container image to run in (required)
 #   --gpus <N>         ranks per node (default: all GPUs on the first host)
 #   --master-addr <ip> rendezvous address (default: the first host)
@@ -52,10 +55,12 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/common.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib_hosts.sh"
 
 die() { echo "[ERROR] $*" >&2; exit 1; }
 
-HOSTS_RAW=""
+HOST_SPECS=()
 IMAGE=""
 GPUS=""
 MASTER_ADDR_ARG=""
@@ -63,7 +68,8 @@ MASTER_PORT="${MASTER_PORT:-29500}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --host|--hosts) HOSTS_RAW="${2:?}"; shift 2 ;;
+    --host|--hosts) HOST_SPECS+=("lit:${2:?}"); shift 2 ;;
+    --hosts-file)   HOST_SPECS+=("file:${2:?}"); shift 2 ;;
     --image)        IMAGE="${2:?}"; shift 2 ;;
     --gpus)         GPUS="${2:?}"; shift 2 ;;
     --master-addr)  MASTER_ADDR_ARG="${2:?}"; shift 2 ;;
@@ -73,14 +79,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-HOSTS=()
-IFS=',' read -ra _parts <<< "${HOSTS_RAW:-localhost}"
-for h in "${_parts[@]}"; do
-  h="$(echo "$h" | xargs)"
-  [[ -n "$h" ]] || continue
-  [[ "$h" =~ ^[A-Za-z0-9._-]+$ ]] || die "Invalid host: $h"
-  HOSTS+=("$h")
-done
+if [[ "${#HOST_SPECS[@]}" -eq 0 && -n "${MLPERF_HOSTFILE:-}" ]]; then
+  HOST_SPECS+=("file:${MLPERF_HOSTFILE}")
+  echo "[INFO] using MLPERF_HOSTFILE=${MLPERF_HOSTFILE}"
+fi
+[[ "${#HOST_SPECS[@]}" -gt 0 ]] || HOST_SPECS=("lit:localhost")
+
+hosts_expand HOSTS "${HOST_SPECS[@]}" || exit 64
 [[ "${#HOSTS[@]}" -ge 1 ]] || die "no hosts given"
 [[ -n "$IMAGE" ]] || die "--image is required"
 
