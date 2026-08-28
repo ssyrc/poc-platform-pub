@@ -46,6 +46,7 @@ declare -A _TRAIN_PARAM_MAP=(
   [--warmup-steps]=WARMUP_STEPS
   [--target-log-ppl]=TARGET_LOG_PPL
   [--extra-overrides]=MLPERF_EXTRA_OVERRIDES
+  [--grad-accum]=MLPERF_GRAD_ACCUM
 )
 
 # Returns 0 and sets TRAIN_PARAM_SHIFT=2 when $1 is one of ours.
@@ -73,10 +74,25 @@ train_params_validate() {
   pp="$(_tp_get PP 1)"
   cp="$(_tp_get CP 1)"
   mbs="$(_tp_get MBS 1)"
-  gbs="$(_tp_get GBS 128)"
+
+  # GBS is derived from the node count unless it was given. A fixed default
+  # cannot be right at every size: DP grows with the nodes, so a constant GBS
+  # means each GPU does proportionally less work per step and runs at different
+  # node counts stop being comparable. Deriving it keeps grad_accum -- the work
+  # per GPU per step -- the same, and at one node it reproduces the previous
+  # default of 128 exactly.
+  local gbs_explicit=0
+  [[ -n "${TRAIN_PARAMS[GBS]:-}" || -n "${GBS:-}" ]] && gbs_explicit=1
+  local grad_target; grad_target="$(_tp_get MLPERF_GRAD_ACCUM 128)"
+  local gbs
+  if (( gbs_explicit )); then
+    gbs="$(_tp_get GBS 128)"
+  else
+    gbs=0   # filled in below, once DP is known
+  fi
 
   local name val
-  for name in TP:"$tp" PP:"$pp" CP:"$cp" MBS:"$mbs" GBS:"$gbs"; do
+  for name in TP:"$tp" PP:"$pp" CP:"$cp" MBS:"$mbs" GRAD_ACCUM:"$grad_target"; do
     val="${name#*:}"
     [[ "$val" =~ ^[0-9]+$ && "$val" -ge 1 ]] || {
       echo "[ERROR] ${name%%:*} must be a positive integer: ${val}" >&2; exit 64; }
@@ -92,12 +108,26 @@ train_params_validate() {
     exit 64
   fi
   dp=$(( world / mp ))
+
+  if (( ! gbs_explicit )); then
+    gbs=$(( mbs * dp * grad_target ))
+    TRAIN_PARAMS[GBS]="$gbs"
+    echo "[INFO] GBS not given; derived ${gbs} = MBS(${mbs}) x DP(${dp}) x grad_accum(${grad_target})"
+    echo "[INFO] pass --gbs to fix it, or --grad-accum to change the per-GPU work"
+  fi
+
+  [[ "$gbs" =~ ^[0-9]+$ && "$gbs" -ge 1 ]] || {
+    echo "[ERROR] GBS must be a positive integer: ${gbs}" >&2; exit 64; }
+
   if (( gbs < mbs * dp )); then
     echo "[ERROR] GBS=${gbs} must be >= MBS(${mbs}) * DP(${dp}) = $(( mbs * dp ))" >&2
     exit 64
   fi
   if (( gbs % (mbs * dp) != 0 )); then
-    echo "[ERROR] GBS=${gbs} must be divisible by MBS(${mbs}) * DP(${dp}) = $(( mbs * dp ))" >&2
+    local unit=$(( mbs * dp ))
+    echo "[ERROR] GBS=${gbs} must be divisible by MBS(${mbs}) * DP(${dp}) = ${unit}" >&2
+    echo "[ERROR] nearest valid: $(( gbs / unit * unit )) or $(( (gbs / unit + 1) * unit ))" >&2
+    echo "[ERROR] or omit --gbs and it is derived from the node count" >&2
     exit 64
   fi
   grad=$(( gbs / (mbs * dp) ))
@@ -124,7 +154,11 @@ train_params_help() {
     --cp <N>                 context parallel     (default: 1)
   Batch:
     --mbs <N>                micro batch size     (default: 1)
-    --gbs <N>                global batch size    (default: 128)
+    --gbs <N>                global batch size
+                             omit and it is derived from the node count:
+                             MBS x DP x grad-accum
+    --grad-accum <N>         per-GPU work per step when --gbs is omitted
+                             (default: 128)
     --minibs <N>             mini batch size
   Schedule / model:
     --seq-len <N>            sequence length      (default: 8192)
