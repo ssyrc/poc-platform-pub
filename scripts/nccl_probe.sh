@@ -67,7 +67,13 @@ IMAGE=""
 GPUS=""
 MASTER_ADDR_ARG=""
 MASTER_PORT="${MASTER_PORT:-29500}"
-PROBE_RDZV_TIMEOUT="${PROBE_RDZV_TIMEOUT:-90}"
+# How long rank 0 keeps accepting joiners. This is not only "how fast a missing
+# node is reported": it is also the window a slow node has to arrive in. Too
+# short and a node that is merely late gets its store connection closed
+# mid-join, which reads as a network fault rather than a race. Containers on a
+# cold node can take minutes to start, so this is generous by default and can
+# be lowered when a fast answer matters more.
+PROBE_RDZV_TIMEOUT="${PROBE_RDZV_TIMEOUT:-600}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -154,7 +160,7 @@ done
 
 if (( NNODES > 1 )); then
   echo "[INFO] mode=multi nnodes=${NNODES} hosts=${HOSTS[*]} gpus_per_node=${GPUS:-<all>}"
-  echo "[INFO] rendezvous=${MASTER_ADDR}:${MASTER_PORT} (rank 0 = ${HOSTS[0]})"
+  echo "[INFO] rendezvous=${MASTER_ADDR}:${MASTER_PORT} (rank 0 = ${HOSTS[0]}), join window ${PROBE_RDZV_TIMEOUT}s"
 else
   echo "[INFO] mode=single host=${HOSTS[0]} gpus=${GPUS:-<all>}"
 fi
@@ -236,7 +242,7 @@ if [[ -z "\$gpus" ]]; then
   gpus="\$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | wc -l)"
 fi
 [[ "\$gpus" =~ ^[0-9]+\$ && "\$gpus" -ge 1 ]] || { echo "[ERROR] no GPUs detected" >&2; exit 1; }
-echo "[REMOTE] node_rank=${node_rank} nproc_per_node=\$gpus"
+echo "[REMOTE] node_rank=${node_rank} nproc_per_node=\$gpus starting torchrun at \$(date +%H:%M:%S)"
 
 work="\$(mktemp -d)"
 trap 'rm -rf "\$work"' EXIT
