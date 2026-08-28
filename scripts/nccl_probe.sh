@@ -277,13 +277,26 @@ for i in "${!HOSTS[@]}"; do
 done
 echo "  ----------------------------------------------------------------"
 
-joined="$(grep -ahoE 'total +[0-9]+ +nodes: [0-9]+' "${STATUS_DIR}"/*.log 2>/dev/null | tail -1 || true)"
-[[ -n "$joined" ]] && echo "  world formed: ${joined}"
+# Overall verdict from the probe's own RESULT line. Separate from the per-host
+# column above: a host that ran correctly reads ok even when the job is short.
+result_line="$(grep -ahoE '\[probe\] RESULT .*' "${STATUS_DIR}"/*.log 2>/dev/null | tail -1 || true)"
+if [[ -n "$result_line" ]]; then
+  got_world="$(sed -n 's/.*world=\([0-9]*\).*/\1/p' <<< "$result_line")"
+  exp_world="$(sed -n 's/.*expected=\([0-9]*\).*/\1/p' <<< "$result_line")"
+  got_nodes="$(sed -n 's/.*nodes=\([0-9]*\).*/\1/p' <<< "$result_line")"
+  echo "  world formed: ${got_world}/${exp_world} ranks, ${got_nodes}/${NNODES} nodes"
+  if [[ -n "$got_world" && -n "$exp_world" && "$got_world" != "$exp_world" ]]; then
+    echo "  [FAIL] $(( exp_world - got_world )) rank(s) short -- the hosts above with a" >&2
+    echo "         non-zero exit are the ones that did not join" >&2
+    RC=1
+  fi
+elif (( RC == 0 )); then
+  echo "  [WARN] no RESULT line found; the probe may not have reached rank 0's report" >&2
+  RC=1
+fi
 
 if (( RC == 0 )); then
   echo "  all ${NNODES} host(s) OK"
-else
-  echo "  at least one host failed; the note column is from its own output" >&2
 fi
 echo "===================================================================="
 exit "$RC"

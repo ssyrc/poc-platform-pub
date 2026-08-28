@@ -134,11 +134,21 @@ if rank == 0:
     print("  busbw is the comparable number across world sizes.", flush=True)
     print("=" * 68 + "\n", flush=True)
 
+    # One machine-readable line for the launcher to base its verdict on,
+    # rather than having it re-parse the table above.
+    print(f"[probe] RESULT world={world_size} expected={expected_world} "
+          f"nodes={len(by_host)} correct={correct}", flush=True)
+
 dist.destroy_process_group()
 
+# Exit status describes THIS rank only. A short world is a property of the job,
+# not of the ranks that turned up: exiting non-zero everywhere would mark every
+# healthy node as failed and bury the one that actually did. The launcher
+# decides the overall verdict from the RESULT line.
 if not correct:
     sys.exit(1)
-if world_size != expected_world:
-    sys.exit(2)
 if rank == 0:
-    log(f"ALL OK -- {world_size} ranks across {len(by_host)} node(s)")
+    if world_size != expected_world:
+        log(f"this node is fine; the job is {expected_world - world_size} rank(s) short")
+    else:
+        log(f"ALL OK -- {world_size} ranks across {len(by_host)} node(s)")
