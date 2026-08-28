@@ -122,7 +122,13 @@ if [[ -z "${NCCL_NET_PLUGIN:-}" && "$(printf '%s' "$GPU_NAME" | tr '[:lower:]' '
   echo "[INFO] B300 detected: NCCL_NET_PLUGIN=none (HPC-X plugin crashes ncclCommInitRankConfig)"
 fi
 
+# The probe compares what joined against what was asked for; only this side
+# knows the latter.
+export PROBE_EXPECTED_WORLD=$(( GPUS * NNODES ))
+export PROBE_EXPECTED_HOSTS="$(IFS=,; echo "${HOSTS[*]}")"
+
 PASS_ENV=(
+  PROBE_EXPECTED_WORLD PROBE_EXPECTED_HOSTS
   NCCL_DEBUG NCCL_DEBUG_SUBSYS
   NCCL_MNNVL_ENABLE NCCL_CUMEM_ENABLE NCCL_NVLS_ENABLE
   NCCL_NET_PLUGIN NCCL_TUNER_PLUGIN NCCL_NET NCCL_COLLNET_ENABLE
@@ -227,7 +233,10 @@ trap 'rm -rf "$STATUS_DIR"' EXIT
 for i in "${!HOSTS[@]}"; do
   h="${HOSTS[$i]}"
   (
-    emit_remote "$i" | cm_remote_bash "$h" 2>&1 | sed "s/^/[${h}] /"
+    # set +e, or pipefail would end this subshell the moment the pipeline
+    # fails -- losing the exit status of exactly the hosts worth reporting.
+    set +e
+    emit_remote "$i" | cm_remote_bash "$h" 2>&1 | tee "${STATUS_DIR}/${i}.log" | sed "s/^/[${h}] /"
     echo "${PIPESTATUS[1]}" > "${STATUS_DIR}/${i}"
   ) &
   PIDS+=("$!")
@@ -235,18 +244,46 @@ done
 
 for pid in "${PIDS[@]}"; do wait "$pid" || true; done
 
+# Why a host failed, taken from its own output. Ordered most specific first so
+# the line shown is the one worth reading.
+failure_reason() {
+  local f="$1" line
+  [[ -r "$f" ]] || { printf 'no output captured'; return; }
+  for pat in 'Error response from daemon' 'docker: ' 'CUDA error' \
+             'Fatal Python error' '^[A-Za-z_.]*Error: ' 'RendezvousTimeout' \
+             'no space left' 'Permission denied' 'NCCL WARN' '\[ERROR\]'; do
+    line="$(grep -aoE "${pat}.*" "$f" 2>/dev/null | tail -1)"
+    [[ -n "$line" ]] && { printf '%.100s' "$line"; return; }
+  done
+  line="$(grep -av '^\s*$' "$f" 2>/dev/null | tail -1)"
+  printf '%.100s' "${line:-exited without output}"
+}
+
 RC=0
 echo
-echo "[INFO] per-host result:"
+echo "===================================================================="
+echo "PER-HOST RESULT"
+echo "===================================================================="
+printf '  %-4s %-20s %-6s %s\n' "rank" "host" "exit" "note"
+echo "  ----------------------------------------------------------------"
 for i in "${!HOSTS[@]}"; do
   st="$(cat "${STATUS_DIR}/${i}" 2>/dev/null || echo "?")"
-  printf '  rank %-3s %-20s exit=%s\n' "$i" "${HOSTS[$i]}" "$st"
-  [[ "$st" == "0" ]] || RC=1
+  if [[ "$st" == "0" ]]; then
+    printf '  %-4s %-20s %-6s %s\n' "$i" "${HOSTS[$i]}" "$st" "ok"
+  else
+    printf '  %-4s %-20s %-6s %s\n' "$i" "${HOSTS[$i]}" "$st" "$(failure_reason "${STATUS_DIR}/${i}.log")"
+    RC=1
+  fi
 done
+echo "  ----------------------------------------------------------------"
+
+joined="$(grep -ahoE 'total +[0-9]+ +nodes: [0-9]+' "${STATUS_DIR}"/*.log 2>/dev/null | tail -1 || true)"
+[[ -n "$joined" ]] && echo "  world formed: ${joined}"
 
 if (( RC == 0 )); then
-  echo "[INFO] multi-node NCCL OK across ${NNODES} nodes"
+  echo "  all ${NNODES} host(s) OK"
 else
-  echo "[INFO] at least one node failed -- see its output above" >&2
+  echo "  at least one host failed; the note column is from its own output" >&2
 fi
+echo "===================================================================="
 exit "$RC"
