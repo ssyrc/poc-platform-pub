@@ -1,7 +1,7 @@
 # Next Steps
 
-- 갱신: 2026-08-28 (17회차)
-- 상태: 단일 노드 학습 통과 / 멀티노드 NCCL(IB) 통과 / **멀티노드 학습 재시도 단계**
+- 갱신: 2026-08-28 (18회차)
+- 상태: **2노드 학습(TP=8 PP=2) 완주.** 다음은 8노드 확장
 
 ---
 
@@ -13,7 +13,7 @@
 | 단일 노드 학습 llama31_8b 8장 | **통과** |
 | 멀티노드 NCCL — Socket | 통과 (진단용, 쓰지 않음) |
 | 멀티노드 NCCL — **IB + GDR** | **통과** |
-| 멀티노드 학습 | `npy_index` 문제로 실패 → **고침**, 재시도 필요 |
+| 멀티노드 학습 (2노드, TP=8 PP=2) | **통과 — 완주** |
 
 ### 해결된 원인 세 가지
 
@@ -101,40 +101,123 @@ TAR=/mgmt/server/poc-platform/data/dockerimgs/llama31_8b-pyt-blackwell.tar
 
 ---
 
-## STEP 1 — 멀티노드 학습 (PP=1, DP=2)
+## 노드 목록
+
+8개를 커맨드라인에 나열하면 실수하기 쉬우니 변수로 둡니다.
 
 ```bash
-UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
-MLPERF_TRAIN_IMAGE_TAR=$TAR \
-./scripts/run_multi_node.sh --hosts $N1,$N2 \
-  --benchmark llama31_8b --docker-image $IMG \
-  --tp 8 --pp 1 --cp 1 --mbs 1 --gbs 256 --max-steps 10
+HOSTS=node19,node20,<노드3>,<노드4>,<노드5>,<노드6>,<노드7>,<노드8>
 ```
 
-**로그에서 확인할 것**
+`--hosts`의 **순서가 rank를 정합니다.** 첫 번째가 rank 0이고 `MASTER_ADDR`가 됩니다.
 
+---
+
+## STEP 1 — 8노드 사전 점검 (2분)
+
+2노드에서 겪은 것들(이미지 없음, ACS, tar 경로)이 새 노드 6대에서 그대로 반복될 수
+있습니다. 학습 전에 한 번에 걸러냅니다.
+
+```bash
+for h in ${HOSTS//,/ }; do
+  echo "=========== $h"
+  ./scripts/node_check.sh --host $h --image $IMG
+done
 ```
-[INFO] image ready on all 2 host(s)
-[INFO] parallel: TP=8 PP=1 CP=1 -> DP=2 (world=16)
-[INFO] batch:    MBS=1 GBS=256 grad_accum=128
-[INFO] npy_index_dir=...        <- 두 노드에서 같은 경로여야 합니다
-[CONTAINER] B300: NCCL_NET_PLUGIN=none ...
-++trainer.precision=bf16
+
+각 노드에서 볼 것:
+
+- 드라이버 / fabricmanager / `/dev/infiniband` — `MISS` 없을 것
+- **ACS** — 새 노드도 꺼져 있어야 합니다
+- 데이터가 같은 경로로 보일 것
+
+```bash
+for h in ${HOSTS//,/ }; do
+  printf '%-16s ' "$h"
+  ssh $h 'ls /mgmt/server/poc-platform/data/training_llama31_8b/8b >/dev/null 2>&1 && echo "data OK" || echo "data MISSING"'
+done
 ```
 
 ---
 
-## STEP 2 — 단일 노드와 비교
+## STEP 2 — 8노드 NCCL 프로브 (30초) ← 학습 전에 반드시
+
+**5분짜리 학습으로 디버깅하지 않기 위한 단계입니다.** 지금까지 이게 다 잡아냈습니다.
 
 ```bash
-MLPERF_TRAIN_IMAGE_TAR=$TAR \
-./scripts/run_single_node.sh --host $N1 \
-  --benchmark llama31_8b --docker-image $IMG \
-  --tp 8 --pp 1 --mbs 1 --gbs 128 --max-steps 10
+NCCL_DEBUG=INFO UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
+./scripts/nccl_probe.sh --hosts $HOSTS --image $IMG
 ```
 
-GBS가 128인 이유: 단일 노드는 DP=1이므로 스텝당 샘플 수가 2노드(GBS=256, DP=2)와
-같아집니다. **여기서 SHARP 부재가 처음 수치로 드러납니다.**
+**`all_reduce OK (= 64)`** 가 나와야 합니다. 64가 아니면 랭크가 빠진 것입니다.
+
+```
+[INFO] per-host result:
+  rank 0   node19    exit=0
+  ...
+  rank 7   <노드8>          exit=0
+[INFO] multi-node NCCL OK across 8 nodes
+```
+
+실패하면 **어느 rank인지**가 로그에 나옵니다. 그 노드만 2노드 프로브로 좁히세요.
+
+```bash
+./scripts/nccl_probe.sh --hosts node19,<의심 노드> --image $IMG
+```
+
+---
+
+## STEP 3 — 스케일링 측정 (1 → 2 → 4 → 8)
+
+**`GBS=1024`를 고정**하고 노드 수만 바꿉니다. 그래야 스텝 시간이 곧 speedup입니다.
+
+| 노드 | WORLD | TP | PP | DP | GBS | grad_accum |
+|---|---|---|---|---|---|---|
+| 1 | 8 | 8 | 1 | 1 | 1024 | 1024 |
+| 2 | 16 | 8 | 1 | 2 | 1024 | 512 |
+| 4 | 32 | 8 | 1 | 4 | 1024 | 256 |
+| 8 | 64 | 8 | 1 | **8** | 1024 | 128 |
+
+네 구성 모두 런처 검증을 통과합니다.
+
+```bash
+# 8노드
+UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
+MLPERF_TRAIN_IMAGE_TAR=$TAR \
+./scripts/run_multi_node.sh --hosts $HOSTS \
+  --benchmark llama31_8b --docker-image $IMG \
+  --tp 8 --pp 1 --cp 1 --mbs 1 --gbs 1024 --max-steps 10
+
+# 4노드 / 2노드는 --hosts 만 줄이면 됩니다 (나머지 인자 동일)
+```
+
+**왜 PP=1인가** — DP가 커져야 노드 간 **gradient allreduce**가 커지고, 그게 멀티노드
+스케일링에서 실제로 재고 싶은 것입니다. PP=2도 돌지만(8노드면 DP=4) allreduce가
+줄어들어 스케일링 측정으로는 덜 적합합니다.
+
+---
+
+## STEP 4 — 결과 해석
+
+스텝 시간을 노드 수에 대해 보세요.
+
+| 관찰 | 의미 |
+|---|---|
+| 노드 2배 → 스텝 시간 거의 절반 | 정상 스케일링 |
+| 4→8에서 개선이 꺾임 | allreduce가 병목. **SHARP 부재가 여기서 드러납니다** |
+| 특정 노드 수에서만 급락 | 그 노드 세트의 IB 경로 문제. 프로브로 좁히세요 |
+
+**8노드는 SHARP 부재가 가장 크게 드러나는 지점입니다.** allreduce 트래픽이 노드 수에
+비례해 커지는데, in-network reduction이 바로 그걸 줄여주는 기능이라서요.
+정식 측정을 하실 거면 이 수치를 근거로 이미지 교체 여부를 정하시면 됩니다.
+
+---
+
+## STEP 5 — 회신
+
+1. STEP 2 — 8노드 프로브 `= 64` 통과 여부
+2. STEP 3 — 1/2/4/8 스텝 시간
+3. STEP 1에서 걸린 노드가 있었는지
 
 ---
 
@@ -153,20 +236,13 @@ GBS가 128인 이유: 단일 노드는 DP=1이므로 스텝당 샘플 수가 2�
 PP=2로 가면 그게 거의 사라져서 **멀티노드 통신을 시험하는 구성이 아니게 됩니다.**
 PP는 모델이 안 들어갈 때 쓰는 카드이고, llama31_8b는 TP=8로 충분합니다.
 
-병렬화 전략 비교가 목적이면 STEP 1이 끝난 뒤에 돌려보세요.
+병렬화 전략 비교가 목적이면 STEP 3이 끝난 뒤에 돌려보세요.
 그때 `virtual_pipeline` 관련 에러가 나면 이렇게 넘깁니다. (런처는 PP=1일 때만
 자동으로 꺼줍니다.)
 
 ```bash
 --extra-overrides "++model.virtual_pipeline_model_parallel_size=null"
 ```
-
----
-
-## STEP 3 — 회신
-
-1. STEP 1 — 스텝이 도는지, `npy_index_dir`이 두 노드에서 같은지
-2. STEP 2 — 1노드 대비 2노드 스텝 시간
 
 ---
 
