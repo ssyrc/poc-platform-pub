@@ -1,41 +1,55 @@
 # Next Steps
 
-- 갱신: 2026-08-28 (22회차)
+- 갱신: 2026-08-28 (23회차)
 - 상태: 단일 노드·2노드 학습 통과 / **멀티노드 rendezvous가 노드별로 따로 완료됨**
-- **지금 할 일: 버퍼링 수정 후 다시 돌려 전 노드 출력 확보**
+- **지금 할 일: rendezvous 내부 로그 (`TORCH_DISTRIBUTED_DEBUG` 전달 수정 후)**
 
 ---
 
 ## 지금 확정된 사실
 
-**`[LAUNCH]` 줄은 정상입니다.**
+5노드 실행 (`.26` rank0, `.27`, `.28`, `.29`, `.30`):
 
 ```
-[.29] torchrun --nnodes=4 --node_rank=3 --nproc_per_node=8 \
-      --rdzv_backend=c10d --rdzv-id=probe_28846_1787934197 \
-      --rdzv_endpoint=node26:29500 --rdzv-conf=timeout=600,read_timeout=600
+world formed: 16/40 ranks, 2/5 nodes
+
+  rank host            exit   note
+  0    node26    0      ok
+  1    node27    0      ok
+  2    node28    1      DistNetworkError: Failed to recv, got 0 bytes...
+  3    node29    1      DistNetworkError: ...
+  4    node30    1      DistNetworkError: ...
 ```
 
-`--nnodes`, `--rdzv-id`, `--rdzv_endpoint` 모두 어긋난 곳이 없습니다.
+### 늦어서가 아닙니다 (배제)
 
-### 그런데 로그에 `.29` 것만 나왔습니다 — 그건 제 버그였습니다
+시작 시각을 보면 **가장 늦게 시작한 노드가 성공하고, 가장 먼저 시작한 노드가 실패**합니다.
 
-4노드 실행인데 `.26/.27/.28`은 **한 줄도** 안 나왔습니다. 그 노드들이 아무것도
-안 한 게 아니라, **출력이 `sed` 버퍼에 갇혀 있었습니다.**
+| 노드 | 시작 | 결과 |
+|---|---|---|
+| `.29` | 01:40:10 | **실패** (가장 이름) |
+| `.30` | 01:40:19 | 실패 |
+| `.28` | 01:40:41 | 실패 |
+| `.27` | **01:40:50** | **성공** (가장 늦음) |
 
-```bash
-... | tee "${STATUS_DIR}/${i}.log" | sed "s/^/[${h}] /"     # -u 가 없었음
+**성공한 것은 node_rank 0과 1**입니다. 시작 순서와 무관합니다.
+
+### `[LAUNCH]` 인자도 정상
+
+다섯 호스트 전부 `--nnodes=5`, 같은 `--rdzv-id`, 같은 `--rdzv_endpoint`입니다.
+
+```
+--nnodes=5 --node_rank=N --rdzv-id=probe_31320_1787935247 --rdzv_endpoint=node26:29500
 ```
 
-`-u` 없는 `sed`는 stdout이 터미널이 아닐 때 **4KB 블록 버퍼링**을 합니다.
-`| tee nccl_probe.log`로 파이프하는 순간 그 조건이 됩니다. 여러 호스트가 동시에
-돌면 **"한 노드만 출력이 있다"**로 보이고, 그건 정확히 반대되는 결론입니다.
+`--nnodes=5`면 min=max=5라 **2노드로 완료될 수 없습니다.** 그런데 됐습니다.
+여기부터는 torch 내부를 봐야 합니다.
 
-`mlperf_run.sh`는 `sed -u`를 쓰는데 프로브만 빠져 있었습니다. 고쳤습니다.
+### rendezvous 로그가 안 나온 이유 — 제 버그
 
-> **주의:** 지금까지 **화면으로 본** "어느 노드가 참여했나"는 신뢰할 수 없습니다.
-> 다만 `${STATUS_DIR}/*.log`(호스트별 파일)와 `PER-HOST RESULT` 표는 `tee`가 직접
-> 쓴 것이라 정확합니다.
+`TORCH_DISTRIBUTED_DEBUG`와 `LOGLEVEL`이 **프로브의 전달 목록에 없었습니다.**
+셸에 설정해도 컨테이너까지 가지 않았습니다. 로그의 `env into container` 줄에도
+없습니다. 제가 전달되지 않는 변수를 알려드렸습니다. 추가했습니다.
 
 ## 준비
 
@@ -50,38 +64,35 @@ echo "IMG=[$IMG] TAR=[$TAR]"     # 비어 있으면 조용히 죽습니다
 
 ---
 
-## STEP 1 — 전 노드 출력 확보 (지금 할 일)
+## STEP 1 — rendezvous 내부 로그 (지금 할 일)
 
-**`git pull` 필요.** 이제 모든 호스트 출력이 즉시 나옵니다.
+**`git pull` 필요.** 이제 `TORCH_DISTRIBUTED_DEBUG`/`LOGLEVEL`이 컨테이너까지 갑니다.
 
 ```bash
 TORCH_DISTRIBUTED_DEBUG=DETAIL LOGLEVEL=INFO \
-./scripts/nccl_probe.sh --hosts node26,node27,node28,node29 \
+./scripts/nccl_probe.sh --hosts node26,node27,node28 \
   --image $IMG 2>&1 | tee /mgmt/server/nccl_probe.log
 ```
 
-**볼 것 — 이번엔 네 호스트 모두 나와야 합니다.**
+먼저 이 줄로 **실제로 전달됐는지** 확인하세요.
 
 ```
-[node26] [REMOTE] node_rank=0 ... starting torchrun at HH:MM:SS
-[node27] [REMOTE] node_rank=1 ...
-[node28] [REMOTE] node_rank=2 ...
-[node29] [REMOTE] node_rank=3 ...
+[INFO] env into container: ... TORCH_DISTRIBUTED_DEBUG=DETAIL LOGLEVEL=INFO
 ```
 
-시작 시각이 크게 벌어지는 노드가 있는지, 그리고 `TORCH_DISTRIBUTED_DEBUG=DETAIL`이
-찍는 rendezvous 줄이 노드마다 어떻게 다른지 보시면 됩니다.
+그다음 볼 것:
 
 ```
 The node 'xxx' has joined round N of the rendezvous 'yyy' as rank R of W
 Rendezvous complete for workers. Result: restart_count=... master_addr=...
 ```
 
-`round`·`W`가 노드마다 다르면 거기가 답입니다.
+**`W`가 몇으로 나오는지, `round` 번호가 노드마다 같은지**가 답입니다.
+3노드로 좁혀서 돌리시면 로그를 끝까지 읽을 수 있습니다.
 
 ---
 
-## STEP 2 — 그래도 안 되면: 2노드로 좁히기
+## STEP 2 — 그래도 안 되면: 2노드
 
 여기까지 오면 torch가 뭘 하는지 직접 봐야 합니다.
 
@@ -106,7 +117,8 @@ TORCH_DISTRIBUTED_DEBUG=DETAIL LOGLEVEL=INFO \
 | `read_timeout` 60s | 고침(`fdaa5c6`). 그래도 재현 |
 | 잔존 컨테이너 겹침 | `docker ps` 비어 있음 |
 | `init_process_group` | 실패 지점 아님 |
-| `[LAUNCH]` 인자 | `--nnodes`/`--rdzv-id`/`--rdzv_endpoint` 전부 정상 확인 |
+| `[LAUNCH]` 인자 | 5호스트 전부 `--nnodes=5`, 같은 id·endpoint |
+| 시작 시각 차이 | 가장 늦게 시작한 노드가 성공. 무관 |
 
 ---
 
