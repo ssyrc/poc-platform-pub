@@ -177,6 +177,7 @@ build_env_exports() {
   for env_name in \
     POC_PLATFORM_DOCKERIMG_DIRS \
     MLPERF_TRAIN_IMAGE_TAR \
+    MLPERF_NPY_INDEX_DIR \
     MLPERF_RUN_CMD \
     MLPERF_ENTRY_SCRIPT \
     MLPERF_MAX_STEPS \
@@ -328,6 +329,20 @@ START_TIME="$(date --iso-8601=seconds)"
 START_EPOCH="$(date +%s)"
 STAMP="$(date +%Y%m%d_%H%M%S)"
 LOG_DIR="${LOG_ROOT}/${STAMP}_${HOST}_training_v5.1_${BENCHMARK}_${RUN_ID}"
+
+# Megatron caches its dataset index here -- document_index / sample_index /
+# shuffle_index .npy -- and every rank has to see the same files: rank 0 builds
+# them, the others wait on a barrier and then read them.
+#
+# LOG_DIR embeds this node's timestamp and hostname, so on a multi-node run each
+# node mounted its own empty directory. Rank 0 built the index on its node and
+# every rank elsewhere failed with FileNotFoundError on the .npy files. Single
+# node never showed it, because all ranks shared one LOG_DIR.
+#
+# RUN_ID is the one identifier every node in a run receives unchanged, so key
+# the cache on that. It has to live on storage all the nodes share; set
+# MLPERF_NPY_INDEX_DIR when LOG_ROOT is node-local.
+NPY_INDEX_DIR="${MLPERF_NPY_INDEX_DIR:-${LOG_ROOT}/npy_index_${RUN_ID}}"
 RESULT_DIR="${LOG_DIR}/results"
 
 DOCKERIMG_DIR="${DATA_ROOT}/dockerimgs"
@@ -606,6 +621,7 @@ echo "[INFO] gpu_type=${GPU_TYPE}"
 echo "[INFO] benchmark=${BENCHMARK}"
 echo "[INFO] mlperf_version=v5.1"
 echo "[INFO] log_dir=${LOG_DIR}"
+echo "[INFO] npy_index_dir=${NPY_INDEX_DIR} (must be shared across nodes)"
 
 command -v docker >/dev/null 2>&1 || fail_run "docker unavailable" 20
 command -v nvidia-smi >/dev/null 2>&1 || fail_run "nvidia-smi unavailable" 21
@@ -956,7 +972,7 @@ set -Eeuo pipefail
 trap '"'"'echo "[CONTAINER][FATAL] command failed at line ${LINENO}: ${BASH_COMMAND}" >&2'"'"' ERR
 
 cd "$BENCH_DIR"
-mkdir -p "$RESULT_DIR" "$MLPERF_LOG_DIR/npy_index"
+mkdir -p "$RESULT_DIR" "$NPY_INDEX_DIR"
 
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
@@ -1260,7 +1276,7 @@ fi
 if [[ "$BENCHMARK" == "llama31_8b" ]]; then
   DOCKER_CMD+=(
     -v "${DATA_DIR}:/preproc_data:ro"
-    -v "${LOG_DIR}/npy_index:/npy_index"
+    -v "${NPY_INDEX_DIR}:/npy_index"
   )
 fi
 
