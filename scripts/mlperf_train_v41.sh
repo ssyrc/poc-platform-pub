@@ -605,6 +605,16 @@ trap 'cleanup; emit_summary "stopped" 130 "stopped by signal"; exit 130' INT TER
 
 mkdir -p "$LOG_DIR"
 exec > >(tee -a "${LOG_DIR}/run.log") 2>&1
+LOG_TEE_PID=$!
+
+# Without this the script can exit while tee still has buffered output, which
+# truncates the end of run.log -- usually the part that says what went wrong.
+flush_run_log() {
+  [[ -n "${LOG_TEE_PID:-}" ]] || return 0
+  exec 1>&- 2>&-
+  wait "$LOG_TEE_PID" 2>/dev/null || true
+}
+trap flush_run_log EXIT
 
 echo "[PHASE] validate"
 echo "[INFO] start_time=${START_TIME}"
@@ -1141,9 +1151,20 @@ fi
 
 echo "[PHASE] run"
 
+# Every line the container prints is written to container.log as it arrives,
+# and passed through so it still reaches run.log and the console.
+#
+# run.log is produced by a process-substitution tee set up much earlier; that
+# is one buffered hop away from the training output, and it is shared with the
+# wrapper's own phase logging. container.log is written directly by this pipe,
+# so the training output is on disk in full regardless of what happens to the
+# outer redirection.
+#
+# PIPESTATUS, not $?, because $? would be tee's status and every run would
+# look successful.
 set +e
-"${DOCKER_CMD[@]}"
-EXIT_CODE="$?"
+"${DOCKER_CMD[@]}" 2>&1 | tee -a "${LOG_DIR}/container.log"
+EXIT_CODE="${PIPESTATUS[0]}"
 set -e
 
 echo "[PHASE] collect"
@@ -1155,7 +1176,7 @@ if [[ "$EXIT_CODE" -eq 0 ]]; then
   exit 0
 else
   echo "[PHASE] done"
-  emit_summary "failed" "$EXIT_CODE" "training v4.1 failed; inspect run.log and command.txt"
+  emit_summary "failed" "$EXIT_CODE" "training v4.1 failed; inspect container.log, run.log and command.txt"
   exit "$EXIT_CODE"
 fi
 REMOTE_RUN
