@@ -58,6 +58,8 @@ source "${SCRIPT_DIR}/lib_train_params.sh"
 source "${SCRIPT_DIR}/lib_hosts.sh"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/lib_image_prep.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib_clock.sh"
 
 die() { echo "[ERROR] $*" >&2; exit 1; }
 
@@ -139,6 +141,8 @@ RUN_ID="${RUN_ID:-train${VERSION//./}_multi_$(date +%Y%m%d_%H%M%S)}"
 echo "[INFO] mode=multi nnodes=${NNODES} gpus_per_node=${GPUS} world_size_gpus=${WORLD}"
 echo "[INFO] rank0=${FIRST} (MASTER_ADDR source) hosts=${HOSTS[*]}"
 echo "[INFO] version=${VERSION} benchmark=${BENCHMARK} gpu_type=${GPU_TYPE} run_id=${RUN_ID}"
+
+clock_check_hosts "${HOSTS[@]}"
 
 # GPUs per node is decided once and applied to every node: torchrun is given
 # the same --nproc_per_node everywhere, and Lightning is told devices x

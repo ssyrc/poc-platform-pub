@@ -59,6 +59,8 @@ source "${SCRIPT_DIR}/common.sh"
 source "${SCRIPT_DIR}/lib_hosts.sh"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/lib_image_prep.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/lib_clock.sh"
 
 die() { echo "[ERROR] $*" >&2; exit 1; }
 
@@ -79,6 +81,11 @@ MASTER_PORT="${MASTER_PORT:-29500}"
 # Containers on a cold node can take minutes, so this is generous by default
 # and can be lowered when a fast answer matters more.
 PROBE_RDZV_TIMEOUT="${PROBE_RDZV_TIMEOUT:-600}"
+
+# Without --rdzv-id every run shares the id "none" on the same endpoint, so a
+# leftover agent or a concurrent run is not separated from this one. Unique per
+# invocation, so nothing else can be joined by mistake.
+PROBE_RDZV_ID="probe_$$_$(date +%s)"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -176,6 +183,41 @@ else
   echo "[INFO] env into container: <none>"
 fi
 
+clock_check_hosts "${HOSTS[@]}"
+
+# A container left behind by an earlier run still holds the rendezvous port,
+# and joiners reach that one instead. Nothing above this point would notice:
+# the port answers, so reachability passes.
+if (( NNODES > 1 )); then
+  stale=0
+  for h in "${HOSTS[@]}"; do
+    out="$(cm_remote_bash "$h" "$MASTER_PORT" <<'STALE' 2>/dev/null
+port="$1"
+listener="$(ss -ltnp 2>/dev/null | awk -v p=":${port}$" '$4 ~ p {print $NF; exit}')"
+running="$(docker ps --format '{{.Names}}' 2>/dev/null | head -5 | paste -sd, -)"
+printf '%s|%s
+' "${listener:-none}" "${running:-none}"
+STALE
+)"
+    out="$(printf '%s' "$out" | tail -1 | tr -d '\r')"
+    listener="${out%%|*}"; running="${out#*|}"
+    if [[ "$listener" != "none" ]]; then
+      echo "  ${h}: [STALE] something already listens on ${MASTER_PORT}: ${listener}" >&2
+      stale=1
+    fi
+    if [[ "$running" != "none" ]]; then
+      echo "  ${h}: containers running: ${running}" >&2
+    fi
+  done
+  if (( stale )); then
+    echo >&2
+    echo "[ERROR] the rendezvous port is already in use on a host above." >&2
+    echo "[ERROR] Joiners would reach that listener instead of this run's." >&2
+    echo "[ERROR] Clear it, or pass --master-port with a free port." >&2
+    exit 64
+  fi
+fi
+
 # A node that cannot reach the rendezvous address never joins, and the symptom
 # is a short world with nothing said about which node or why. Check it here,
 # where the answer is one line per host.
@@ -235,7 +277,7 @@ emit_remote() {
   if (( NNODES > 1 )); then
     # This is a pre-flight check, not a job worth waiting ten minutes on: cap
     # the join so a node that never arrives is reported in about a minute.
-    launch="torchrun --nnodes=${NNODES} --node_rank=${node_rank} --nproc_per_node=\"\$gpus\" --rdzv_backend=c10d --rdzv_endpoint=${MASTER_ADDR}:${MASTER_PORT} --rdzv-conf=timeout=${PROBE_RDZV_TIMEOUT},read_timeout=${PROBE_RDZV_TIMEOUT}"
+    launch="torchrun --nnodes=${NNODES} --node_rank=${node_rank} --nproc_per_node=\"\$gpus\" --rdzv_backend=c10d --rdzv-id=${PROBE_RDZV_ID} --rdzv_endpoint=${MASTER_ADDR}:${MASTER_PORT} --rdzv-conf=timeout=${PROBE_RDZV_TIMEOUT},read_timeout=${PROBE_RDZV_TIMEOUT}"
   else
     launch="torchrun --standalone --nnodes=1 --nproc_per_node=\"\$gpus\""
   fi

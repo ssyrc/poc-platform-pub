@@ -1,8 +1,8 @@
 # Next Steps
 
-- 갱신: 2026-08-28 (19회차)
+- 갱신: 2026-08-28 (20회차)
 - 상태: **2노드 학습 완주.** 8노드에서 `node27/29/30`이 all-reduce에 합류 못 함
-- 지금 할 일: 프로브 반복 대신 **서버단 차이 확인**
+- 지금 할 일: rendezvous 격리(잔존 리스너 / 고유 id) 확인
 
 ---
 
@@ -59,63 +59,74 @@ echo "IMG=[$IMG] TAR=[$TAR]"     # 비어 있으면 조용히 죽습니다. 먼�
 
 ---
 
-## STEP 1 — 노드끼리 비교 (지금 할 일)
+## 3. 시계는 원인이 아닙니다 (배제됨)
 
-프로브를 더 돌리지 않고, `.27/.29/.30`이 **뭐가 다른지** 봅니다.
+`node_diff` 결과에서 의미 있는 차이는 **시계 하나**였습니다 (클러스터1 117s, 클러스터2 31s).
+`docker_root_free`는 디스크 사용량이라 무의미합니다.
 
-```bash
-./scripts/node_diff.sh --hosts-file hostfile
-```
+**하지만 all-reduce가 정상인 노드들에서도 65s skew가 나옵니다.** 그러니 원인이 아닙니다.
+검사는 **경고만** 하도록 되돌렸습니다 — 차단으로 두면 지금 도는 구성을 막게 됩니다.
 
-같은 값은 접히고 **다른 것만** 나옵니다. **문제 노드 3대가 한 그룹으로 묶여 나오면 그게 원인**입니다.
-
-보는 항목: 드라이버·GPU 수/모델·ECC·persistence, fabricmanager·IMEX·fabric state,
-`peermem`·`uvm`, **OFED·IB 디바이스 수·Active 링크 수·링크 속도**, ACS redirect,
-docker·nvidia-ctk·docker root 여유공간, memlock, **시계 오차**.
-
-> **`peermem` 미로드는 결함이 아닙니다.** 이 NCCL은 GPU 메모리를 **dma-buf**로
-> 등록합니다(`DMA-BUF is available on GPU device 0`). `peermem`은 대체 경로입니다.
-> 다만 **노드마다 다르면** 그건 볼 만한 차이입니다.
+(고칠 가치는 있습니다. rendezvous heartbeat가 각 노드의 벽시계로 찍히고 남의 시계로
+판정되므로 기여 요인은 될 수 있습니다. 다만 **단독 원인은 아님이 실측으로 확인됐습니다.**)
 
 ---
 
-## STEP 2 — 차이가 없으면 2노드로 좁히기
+## 4. 지금까지 배제된 것
 
-```bash
-for h in node27 node29 node30; do
-  echo "=== rank0 + $h"
-  ./scripts/nccl_probe.sh --hosts node11,$h --image $IMG
-done
-```
-
-2노드로도 안 되면 그 노드 고유 문제, 되는데 8노드에서만 빠지면 규모/타이밍 문제입니다.
+| 가설 | 근거 |
+|---|---|
+| 네트워크 도달 불가 | 도달성 검사 전부 통과. 소켓도 실제로 열림 |
+| GPU 수 불일치 | 전 호스트 8개 확인 |
+| 이미지 없음 | 사전 로드 후 대기, 전 노드 ready |
+| 드라이버/OFED/ACS/peermem 차이 | `node_diff` 25~26개 항목 일치 |
+| **시계 skew** | **정상 노드도 65s** |
+| `read_timeout` 60s | 고침(`fdaa5c6`). 그래도 재현 |
 
 ---
 
-## STEP 3 — 8노드 재시도 (STEP 1·2가 정리된 뒤)
+## STEP 1 — rendezvous 격리 확인 (지금 할 일)
+
+**`git pull` 필요.** 두 가지를 새로 봅니다.
 
 ```bash
 ./scripts/nccl_probe.sh --hosts-file hostfile --image $IMG
 ```
 
-`world formed: 64/64 ranks, 8/8 nodes`가 목표입니다. 부족하면 더 넓혀보세요.
+**(a) 잔존 리스너** — 이전 실행의 컨테이너가 29500을 잡고 있으면, 새로 합류하는 노드가
+**그쪽 store로 갑니다.** 지금까지 아무 검사도 이걸 못 봤습니다. 포트가 응답하니
+도달성 검사는 통과하거든요.
 
-```bash
-PROBE_RDZV_TIMEOUT=1200 ./scripts/nccl_probe.sh --hosts-file hostfile --image $IMG
+```
+  node19: [STALE] something already listens on 29500: users:(("python",pid=...))
+  node19: containers running: mlperf-train-...
 ```
 
-통과하면 학습으로:
+**(b) rendezvous id** — 지금까지 모든 실행이 id `none`을 공유했습니다(이전 로그의
+`rendezvous 'none'`). 이제 실행마다 고유 id를 씁니다. 다른 실행과 섞일 수 없습니다.
+
+이 둘 중 하나가 원인이었다면 이번에 통과하거나, `[STALE]`로 이름이 나옵니다.
+
+---
+
+## STEP 2 — 그래도 안 되면: rendezvous 내부 로그
+
+여기까지 오면 추측을 멈추고 torch가 뭘 하는지 봐야 합니다.
 
 ```bash
-UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
-MLPERF_TRAIN_IMAGE_TAR=$TAR \
-./scripts/run_multi_node.sh --hosts-file hostfile \
-  --benchmark llama31_8b --docker-image $IMG \
-  --tp 8 --pp 1 --cp 1 --mbs 1 --max-steps 10
+TORCH_DISTRIBUTED_DEBUG=DETAIL LOGLEVEL=INFO \
+./scripts/nccl_probe.sh --hosts node19,node27 --image $IMG 2>&1 | tee /tmp/rdzv.log
 ```
 
-`--gbs`는 **생략하세요.** 노드 수에서 파생됩니다(`MBS x DP x grad_accum`, grad_accum 기본 128).
-1/2/4/8노드가 128/256/512/1024가 되어 GPU당 일이 일정하게 유지됩니다.
+**2노드로 좁혀서** 돌리세요. rank 0과 문제 노드만. 볼 것:
+
+```
+Rendezvous complete for workers. Result: restart_count=... master_addr=...
+The node 'xxx' has joined round N of the rendezvous 'yyy' as rank R of W
+```
+
+`.27`이 **join은 하는데 evict되는지**, 아니면 **join 자체를 못 하는지**가 여기서 갈립니다.
+그 로그를 `Errors`에 주세요.
 
 ---
 
@@ -158,6 +169,7 @@ world formed: 56/64 ranks, 7/8 nodes
 | `ae7d479` | 프로브도 이미지 사전 로드 후 대기 |
 | **`fdaa5c6`** | **`read_timeout` — 60초 절단의 실제 원인** |
 | `ec007e8` | `node_diff.sh` |
+| (이번) | 시계 검사 경고로 완화, 고유 rendezvous id, 잔존 리스너 검사 |
 
 ---
 
@@ -165,7 +177,7 @@ world formed: 56/64 ranks, 7/8 nodes
 
 | 항목 | 상태 |
 |---|---|
-| `.27/.29/.30` 미합류 | `read_timeout` 수정 후 재확인 필요. 안 되면 STEP 1의 차이 |
+| `.27/.29/.30` 미합류 | **미해결.** 네트워크·GPU·이미지·드라이버·시계 전부 배제됨 |
 | **SHARP 부재** | B300은 HPC-X 플러그인을 끄므로 in-network reduction 없음. 정식 측정 전 이미지 교체 여부 결정 |
 | 8노드 스케일링 측정 | 1/2/4/8 스텝 시간 비교 (미착수) |
 | llama2_70b_lora | B300에서 미실행 |
