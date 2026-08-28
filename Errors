@@ -1,102 +1,15 @@
 # 클러스터 1 에러 - hostfile에 8노드 지정함
-[node25] node-26049:295:295 [4] NCCL INFO Connected NVLS tree
-[node24] node-26048:295:295 [4] NCCL INFO Connected NVLS tree
-[node20] node-26044:295:295 [4] NCCL INFO Connected NVLS tree
-[node23] node-26047:295:295 [4] NCCL INFO Connected NVLS tree
-[node21] node-26045:295:295 [4] NCCL INFO Connected NVLS tree
-[node20] node-26044:291:291 [0] NCCL INFO Connected NVLS tree
-[node24] node-26048:291:291 [0] NCCL INFO Connected NVLS tree
-[node21] node-26045:291:291 [0] NCCL INFO Connected NVLS tree
-[node23] node-26047:291:291 [0] NCCL INFO Connected NVLS tree
-[node19] node-26043:298:298 [4] NCCL INFO Connected NVLS tree
-[node26] node-26050:296:296 [4] NCCL INFO Connected NVLS tree
-[node26] node-26050:292:292 [0] NCCL INFO Connected NVLS tree
-[node19] node-26043:294:294 [0] NCCL INFO Connected NVLS tree
-[node25] node-26049:291:291 [0] NCCL INFO Connected NVLS tree
-[node20] node-26044:293:293 [2] NCCL INFO Connected NVLS tree
-[node24] node-26048:293:293 [2] NCCL INFO Connected NVLS tree
-[node21] node-26045:293:293 [2] NCCL INFO Connected NVLS tree
-[node23] node-26047:293:293 [2] NCCL INFO Connected NVLS tree
-[node25] node-26049:293:293 [2] NCCL INFO Connected NVLS tree
-[node26] node-26050:294:294 [2] NCCL INFO Connected NVLS tree
-[node19] node-26043:296:296 [2] NCCL INFO Connected NVLS tree
-[node20] node-26044:297:297 [6] NCCL INFO Connected NVLS tree
-[node25] node-26049:297:297 [6] NCCL INFO Connected NVLS tree
-[node23] node-26047:297:297 [6] NCCL INFO Connected NVLS tree
-[node21] node-26045:297:297 [6] NCCL INFO Connected NVLS tree
-[node19] node-26043:300:300 [6] NCCL INFO Connected NVLS tree
-[node24] node-26048:297:297 [6] NCCL INFO Connected NVLS tree
-[node26] node-26050:298:298 [6] NCCL INFO Connected NVLS tree
-[node24] node-26048:292:292 [1] NCCL INFO Connected NVLS tree
-[node20] node-26044:292:292 [1] NCCL INFO Connected NVLS tree
-[node25] node-26049:292:292 [1] NCCL INFO Connected NVLS tree
-[node26] node-26050:293:293 [1] NCCL INFO Connected NVLS tree
-[node19] node-26043:295:295 [1] NCCL INFO Connected NVLS tree
-[node23] node-26047:292:292 [1] NCCL INFO Connected NVLS tree
-[node21] node-26045:292:292 [1] NCCL INFO Connected NVLS tree
-[node24] node-26048:298:298 [7] NCCL INFO Connected NVLS tree
-[node21] node-26045:298:298 [7] NCCL INFO Connected NVLS tree
-[node23] node-26047:298:298 [7] NCCL INFO Connected NVLS tree
-[node20] node-26044:298:298 [7] NCCL INFO Connected NVLS tree
-[node25] node-26049:298:298 [7] NCCL INFO Connected NVLS tree
-[node19] node-26043:301:301 [7] NCCL INFO Connected NVLS tree
-[node26] node-26050:299:299 [7] NCCL INFO Connected NVLS tree
-[node20] node-26044:296:296 [5] NCCL INFO Connected NVLS tree
-[node20] node-26044:294:294 [3] NCCL INFO Connected NVLS tree
-[node21] node-26045:296:296 [5] NCCL INFO Connected NVLS tree
-[node23] node-26047:296:296 [5] NCCL INFO Connected NVLS tree
-[node24] node-26048:296:296 [5] NCCL INFO Connected NVLS tree
-[node25] node-26049:296:296 [5] NCCL INFO Connected NVLS tree
-[node26] node-26050:297:297 [5] NCCL INFO Connected NVLS tree
-[node25] node-26049:294:294 [3] NCCL INFO Connected NVLS tree
-[node21] node-26045:294:294 [3] NCCL INFO Connected NVLS tree
-[node23] node-26047:294:294 [3] NCCL INFO Connected NVLS tree
-[node19] node-26043:297:297 [3] NCCL INFO Connected NVLS tree
-[node24] node-26048:294:294 [3] NCCL INFO Connected NVLS tree
-[node26] node-26050:295:295 [3] NCCL INFO Connected NVLS tree
-[node19] node-26043:299:299 [5] NCCL INFO Connected NVLS tree
-
-====================================================================
-PER-HOST RESULT
-====================================================================
-  rank host                 exit   note
-  ----------------------------------------------------------------
-  0    node19         1      torch.distributed.elastic.multiprocessing.errors.ChildFailedError:
-  1    node20         1      torch.distributed.elastic.multiprocessing.errors.ChildFailedError:
-  2    node21         1      torch.distributed.elastic.multiprocessing.errors.ChildFailedError:
-  3    node23         1      torch.distributed.elastic.multiprocessing.errors.ChildFailedError:
-  4    node24         1      torch.distributed.elastic.multiprocessing.errors.ChildFailedError:
-  5    node25         1      torch.distributed.elastic.multiprocessing.errors.ChildFailedError:
-  6    node26         1      torch.distributed.elastic.multiprocessing.errors.ChildFailedError:
-  7    node27         1      torch.distributed.DistNetworkError: Failed to recv, got 0 bytes. C likely closed. Did t
-  ----------------------------------------------------------------
-  world formed: total                        56       nodes: 7
-  at least one host failed; the note column is from its own output
-====================================================================
 
 
 
 # 클러스터 2 에러 - hostfile에 3노드 지정
-[node28] node-26052:294:294 [1] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
-[node28] node-26052:300:300 [7] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
-[node28] node-26052:296:296 [3] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
-[node28] node-26052:299:299 [6] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
-[node28] node-26052:295:295 [2] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
-[node28] node-26052:298:298 [5] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
-[node28] node-26052:297:297 [4] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
-[node28] node-26052:293:293 [0] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
-
-====================================================================
-PER-HOST RESULT
-====================================================================
-  rank host                 exit   note
-  ----------------------------------------------------------------
-  0    node28         1      torch.distributed.elastic.multiprocessing.errors.ChildFailedError:
-  1    node29         1      torch.distributed.DistNetworkError: Failed to recv, got 0 bytes. Connection was likely closed. Did t
-  2    node30         1      torch.distributed.DistNetworkError: Failed to recv, got 0 bytes. Connection was likely closed. Did t
-  ----------------------------------------------------------------
-  world formed: total                        8        nodes: 1
-  at least one host failed; the note column is from its own output
-====================================================================
-
-
+[node30] [W828 15:23:59.468096143 TCPStore.cpp:138] [c10d] recvValueWithTimeout failed on SocketImpl(fd=45, addr=[node-26054]:43832, remote=[node-26052]:29500): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+[node30] Exception raised from recvBytes at /opt/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:682 (most recent call first):
+[node30] frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x88 (0x7f440cf7fd98 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
+[node30] frame #1: <unknown function> + 0x5cd3cae (0x7f4430206cae in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+[node30] frame #2: <unknown function> + 0x5cd4c10 (0x7f4430207c10 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+[node30] frame #3: <unknown function> + 0x5cd5389 (0x7f4430208389 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+[node29] [W828 15:23:50.544255342 TCPStore.cpp:138] [c10d] recvValueWithTimeout failed on SocketImpl(fd=45, addr=[node-26053]:58786, remote=[node-26052]:29500): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
+[node30] frame #4: c10d::TCPStore::doWait(c10::ArrayRef<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::chrono::duration<long, std::ratio<1l, 1000l> >) + 0x1d5 (0x7f4430204395 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
+[node29] Exception raised from recvBytes at /opt/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:682 (most recent call first):
+[node30] frame #5: c10d::TCPStore::doGet(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) + 0x33 (0x7f4430204723 in /usr/local/lib/python3.12/dist-packages/torch/lib/libtorch_cpu.so)
