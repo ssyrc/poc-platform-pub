@@ -1,106 +1,80 @@
 # Next Steps
 
-`Errors`에 올라온 최신 증상에 대해 **지금 실행할 커맨드**만 모아둔 파일입니다.
-
-- 갱신: 2026-08-26 (14회차)
-- 상태: **멀티노드 NCCL은 Socket으로 성공.** IB/RDMA 경로만 실패
-- 이번 목표: IB를 살리는 것 (Socket은 느려서 벤치마크용으로 못 씁니다)
+- 갱신: 2026-08-26 (15회차)
+- 상태: **IB 멀티노드 NCCL 통과.** 원인은 PCIe ACS였습니다
+- 이번 목표: 멀티노드 학습
 
 ---
 
-## 1. 직접 찾아내신 것 정리
+## 1. 해결된 것
 
-| 시도 | 결과 |
+| | |
 |---|---|
-| IB 기본 | `NET/IB ... status=4 vendor err 81` |
-| `NCCL_IB_DISABLE=1` | 여전히 `net_ib.cc` 에러 (아래 참고) |
-| `NCCL_NET=Socket` | IPv6 link-local(`fe80::...%bond0`)로 붙으려다 timeout |
-| `NCCL_SOCKET_IFNAME='=bond0.3061'` + `NCCL_SOCKET_FAMILY=AF_INET` | **성공. 16 GPU all-reduce 통과** |
+| 원인 | **PCIe ACS**가 NIC↔GPU P2P DMA를 루트 컴플렉스로 우회시킴 |
+| 증상 | IB 멀티노드에서만 `status=4` (`IBV_WC_LOC_PROT_ERR`) |
+| 조치 | ACS 해제 |
+| 확인 | GDR 켠 상태로 IB 멀티노드 프로브 통과 |
 
-Socket 쪽 진단은 정확합니다. NCCL이 `bond0`의 IPv6 link-local을 골랐고,
-`=`로 정확 매칭 + `AF_INET` 강제가 맞는 처방이었습니다.
-
-**그 변수들을 스크립트에 반영했습니다.** 직접 고치신 `NCCL_SOCKET_FAMILY`를 포함해
-`nccl_probe.sh`와 학습 스크립트 양쪽 allowlist에 넣었습니다. 이제 로컬 수정 없이 됩니다.
+단일 노드·`ib_write_bw`·Socket이 전부 멀쩡했던 이유도 이걸로 설명됩니다.
+셋 다 **NIC가 GPU 메모리에 직접 접근하지 않는** 경로였습니다.
 
 ---
 
-## 2. IB 실패의 정체 — GDR 의심이 맞습니다
+## 2. 멀티노드 학습 전에 두 가지
 
-```
-NET/IB: Got completion from peer node20<57713> with status=4 opcode=0 len=0 vendor err 81 (Send) hca mlx5_0
-```
+### 2-1. ACS 영구화 — **지금 하세요**
 
-**`status=4`는 IB verbs의 `IBV_WC_LOC_PROT_ERR` — local protection error입니다.**
+`setpci`로 끄셨다면 **재부팅하면 원복됩니다.**
+긴 벤치마크를 돌리다 노드가 재부팅되면 조용히 예전 증상으로 돌아갑니다.
 
-이건 네트워크가 안 닿는다는 뜻이 **아닙니다.** 링크는 붙었고, QP도 맺어졌고,
-completion까지 돌아왔습니다. 그런데 **로컬 메모리 영역에 HCA가 접근할 권한이 없다**는
-겁니다. 즉 등록(registration)된 메모리 키가 실제로는 못 쓰는 상태입니다.
-
-NCCL이 IB로 보내는 버퍼는 **GPU 메모리**입니다. 그 GPU 메모리를 HCA에 등록하는 게
-GPUDirect RDMA이고, 그 등록이 겉으로만 성공하고 실제 접근이 막히면 정확히 이 에러가 납니다.
-
-### `ib_write_bw`가 되는 것과 모순되지 않습니다
-
-**`ib_write_bw`는 기본적으로 호스트 메모리를 씁니다.** GPU 메모리가 아닙니다.
-그래서 그 테스트는 **파이버·스위치·QP는 정상**임을 증명하지만
-**GDR에 대해서는 아무것도 말해주지 않습니다.** 지금 깨진 건 딱 그 부분입니다.
-
-### 등록 경로가 둘입니다
-
-이전 로그에 이 줄이 있었습니다.
-
-```
-NCCL INFO DMA-BUF is available on GPU device 0
+```bash
+# 현재 상태 재확인 (두 노드 다)
+./scripts/acs_check.sh --host $N1
+./scripts/acs_check.sh --host $N2
 ```
 
-NCCL은 GPU 메모리 등록에 **dma-buf**를 우선 씁니다. `nvidia_peermem`은 그 다음 후보입니다.
-드라이버/MOFED 조합에 따라 **dma-buf 등록이 성공한 척하고 실제 접근에서 깨지는** 경우가
-있고, 증상이 정확히 `status=4`입니다.
+영구 조치는 둘 중 하나입니다.
 
----
+1. **BIOS에서 ACS 해제** — 권장. 보통 "ACS Enable" 또는 IOMMU 항목 아래
+2. **부팅 시 재적용하는 systemd 유닛** — BIOS 옵션이 없거나 재부팅 일정이 안 맞을 때
 
+측정 결과를 남기기 전에 **어느 쪽인지 확정**해 두세요.
+나중에 "그때는 됐는데" 가 되기 쉬운 종류의 설정입니다.
 
-## 시나리오 — `status=4`가 나올 수 있는 경우 (가능성 순)
+### 2-2. 로그 경로 — 고쳤습니다
 
-`status=4` = `IBV_WC_LOC_PROT_ERR`. **"HCA가 로컬 메모리에 접근할 권한이 없다"** 입니다.
-NCCL이 IB로 보내는 버퍼는 GPU 메모리이므로, 아래는 전부 "GPU 메모리를 NIC가 못 읽는다"의
-서로 다른 원인들입니다.
+**`git pull` 필요** (`14c29a1`).
 
-| # | 상황 | 확인 | 조치 | 성능 대가 |
-|---|---|---|---|---|
-| **A** | **PCIe ACS 활성** | `./scripts/acs_check.sh --host <노드>` | ACS 해제 (BIOS 또는 `setpci`) | **없음** |
-| B | GPU BAR1이 작음 | `nvidia-smi -q`의 BAR1 용량 | BIOS: Above 4G Decoding, Resizable BAR | 없음 |
-| C | IOMMU가 P2P 주소 변환 | `/proc/cmdline` | 커널 파라미터 `iommu=pt` | 없음 |
-| D | dma-buf 등록이 겉으로만 성공 | `NCCL_DMABUF_ENABLE=0`으로 통과 | 그 값 유지 + MOFED/드라이버 갱신 | 없음 |
-| E | `nvidia_peermem` 미로드 | `lsmod`에 없음 | `modprobe nvidia_peermem` | 없음 |
-| F | IB/RoCE HCA 혼용 | `NET/IB` 목록에 RoCE 섞임 | `NCCL_IB_HCA`를 IB만 | 없음 |
+로그 루트가 네 스크립트 모두 `/opt/poc-platform/...`로 박혀 있었습니다.
+이제 `.env`에서 정합니다.
 
-### A(ACS)를 1순위로 올린 이유
+```
+MLPERF_LOG_ROOT  >  POC_PLATFORM_ROOT  >  /opt/poc-platform
+```
 
-다른 곳에서 **ACS를 끄니 멀티노드 NCCL이 됐다**는 보고가 있었고,
-무엇보다 **지금까지의 관찰을 전부 설명합니다.**
+**`POC_PLATFORM_ROOT`를 이미 `/mgmt/server/poc-platform`으로 두셨다면
+아무것도 안 하셔도 됩니다.** 로그가 알아서 따라갑니다.
 
-| 관찰 | ACS로 설명되는가 |
-|---|---|
-| 단일 노드 8장 정상 | **설명됨.** GPU끼리는 NVLink. PCIe P2P도 NIC도 안 씀 |
-| `ib_write_bw` 정상 | **설명됨.** 호스트 메모리↔NIC는 P2P가 아님 |
-| Socket 멀티노드 정상 | **설명됨.** 호스트 메모리 경유. P2P 없음 |
-| IB 멀티노드만 `status=4` | **설명됨.** 여기서만 NIC가 GPU BAR에 직접 DMA |
+```
+/mgmt/server/poc-platform/mlperf_logs_train_v51/...
+```
 
-ACS는 같은 스위치 아래 장치 간 P2P 트랜잭션을 **루트 컴플렉스로 강제 우회**시킵니다.
-NIC가 GPU BAR로 보낸 DMA가 위로 끌려가 IOMMU 변환을 거치면, 등록 때 받은 버스 주소가
-더 이상 GPU 메모리로 해석되지 않고 → HCA가 local protection error를 냅니다.
+따로 지정하려면 `.env`에 한 줄이면 됩니다.
 
-**A·B·C는 셋 다 "NIC가 GPU BAR에 직접 DMA를 못 하게 막는" 부류**이고,
-**D·E는 "등록 방법"** 문제입니다. 부류가 다르므로 아래 STEP 1으로 먼저 가릅니다.
+```bash
+MLPERF_LOG_ROOT=/mgmt/server/poc-platform
+```
+
+각 suite가 자기 하위 디렉터리를 붙이므로(`mlperf_logs_train_v51`,
+`mlperf_logs_infer_v60` …) 루트 하나만 주시면 됩니다.
+
+> **멀티노드에서 중요합니다.** 로그는 컨테이너를 띄운 **각 노드**에 쓰입니다.
+> 이 경로가 공유 스토리지면 한 실행의 로그가 한곳에 모입니다.
+> 디렉터리 이름에 호스트명이 들어가므로 노드끼리 충돌하지 않습니다.
 
 ---
 
 ## 준비
-
-**`git pull` 필요** — `cb7737e` (`NCCL_DMABUF_ENABLE` / `NCCL_NET_GDR_LEVEL` /
-`NCCL_SOCKET_FAMILY` forward), `acs_check.sh` 추가분.
 
 ```bash
 cd /mgmt/server/poc-platform/poc-platform-pub
@@ -109,216 +83,118 @@ git pull
 N1=node19
 N2=node20
 IMG=registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell
-
-COMMON="NCCL_NET_PLUGIN=none NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET \
-UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1"
+TAR=/mgmt/server/poc-platform/data/dockerimgs/llama31_8b_pyt-blackwell.tar
 ```
 
 ---
 
-## STEP 1 — ACS 확인 (1분, 먼저)
+## STEP 1 — 데이터가 양쪽에 보이는지 (10초)
 
-ssh만 씁니다. 설정을 바꾸지 않고 **읽기만** 합니다.
-
-```bash
-./scripts/acs_check.sh --host $N1
-./scripts/acs_check.sh --host $N2
-```
-
-빨간 줄이 나오면 그 브리지가 P2P를 우회시키고 있습니다.
-스크립트가 해제용 `setpci` 명령까지 만들어 주지만 **실행하지는 않습니다.**
-
-해제 후에는 반드시 프로브로 확인하세요.
-
-```bash
-env $COMMON ./scripts/nccl_probe.sh --hosts $N1,$N2 --image $IMG
-```
-
-**주의 세 가지**
-
-- `setpci`는 **재부팅하면 원복**됩니다. 영구 조치는 BIOS 설정(보통 "ACS Enable",
-  또는 IOMMU 항목 아래)이거나 부팅 시 재적용하는 systemd 유닛입니다.
-- ACS 해제는 **PCIe 장치 간 격리를 약화**시킵니다. 이 호스트에서 VM에 장치를
-  패스스루하거나 IOMMU 그룹 격리에 의존한다면 고려가 필요합니다.
-  전용 베어메탈 학습 노드라면 이게 정상 구성입니다.
-- **두 노드 다** 해제해야 합니다.
-
----
-
-## STEP 2 — GDR 껐다 켜서 부류부터 가르기 (30초)
-
-먼저 **"GDR 문제냐 아니냐"** 를 확정합니다. 이게 갈려야 나머지가 의미 있습니다.
-
-```bash
-env $COMMON NCCL_NET_GDR_LEVEL=LOC \
-./scripts/nccl_probe.sh --hosts $N1,$N2 --image $IMG
-```
-
-> `LOC`는 숫자 `0`과 같은 값입니다. NIC와 GPU가 "같은 디바이스"일 때만 GDR을 쓰라는 뜻이라
-> 사실상 GDR 해제입니다. 다른 곳에서 제안받으신 것과 동일한 테스트입니다.
-
-| 결과 | 결론 | 다음 |
-|---|---|---|
-| **통과** | **GDR 확정.** IB·파이버·QP는 정상 | STEP 2 |
-| status=4 계속 | GDR 문제 아님 | STEP 5 |
-
----
-
-## STEP 3 — 등록 경로(D) 확인 (30초)
-
-GDR은 켠 채로 **등록 경로만** 바꿉니다.
-
-```bash
-env $COMMON NCCL_DMABUF_ENABLE=0 \
-./scripts/nccl_probe.sh --hosts $N1,$N2 --image $IMG
-```
-
-| 결과 | 결론 |
-|---|---|
-| **통과** | **시나리오 D.** dma-buf만 깨진 것. 이 값 하나로 끝, 성능 손실 없음 |
-| status=4 계속 | D 아님 → STEP 4로 |
-
----
-
-## STEP 4 — 호스트 조건 B·E 확인 (ssh, 1분)
-
-**두 노드 다** 봐야 합니다. 한쪽만 어긋나도 실패합니다.
+멀티노드는 모든 노드가 같은 경로로 데이터를 봐야 합니다.
 
 ```bash
 for h in $N1 $N2; do
   echo "=== $h ==="
-  # B: peermem
-  ssh $h 'lsmod | grep -E "nvidia_peermem|nv_peer_mem" || echo "  peermem: NOT LOADED"'
-  # C: BAR1 — GPU 메모리를 NIC에 노출하는 창. 작으면 등록이 실패합니다
-  ssh $h 'nvidia-smi -q | grep -iA3 "BAR1 Memory"| head -8'
+  ssh $h 'ls /mgmt/server/poc-platform/data/training_llama31_8b/8b 2>&1 | head -3'
+  ssh $h "docker image inspect $IMG >/dev/null 2>&1 && echo '  image: OK' || echo '  image: MISSING'"
 done
 ```
 
-**B 조치**
+이미지가 없는 노드가 있으면 먼저 올려두세요.
 
 ```bash
-ssh <노드> 'modprobe nvidia_peermem && echo nvidia_peermem > /etc/modules-load.d/nvidia-peermem.conf'
+ssh <노드> "docker load -i $TAR"
 ```
-
-**C 판단**: B300은 BAR1이 GPU 메모리 크기에 맞먹게 잡혀야 정상입니다.
-수백 MB 수준으로 작게 나오면 BIOS에서 **Above 4G Decoding**과 **Resizable BAR**가 꺼진 것입니다.
-이건 재부팅이 필요합니다.
 
 ---
 
-## STEP 5 — IOMMU(C) 확인 (ssh, 30초)
-
-**D: PCIe ACS.** 켜져 있으면 NIC→GPU 직접 DMA가 루트 컴플렉스로 우회되면서 막힙니다.
-GDR을 죽이는 가장 대표적인 원인입니다.
+## STEP 2 — 멀티노드 학습 (2노드 16 GPU)
 
 ```bash
-ssh $N1 'lspci -vvv 2>/dev/null | grep -i ACSCtl | grep -v "SrcValid-" | head'
+UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
+MLPERF_TRAIN_IMAGE_TAR=$TAR \
+./scripts/run_multi_node.sh --hosts $N1,$N2 \
+  --benchmark llama31_8b --docker-image $IMG \
+  --tp 8 --pp 1 --cp 1 --mbs 1 --gbs 256 --max-steps 10
 ```
 
-아무것도 안 나오면 ACS 해제 상태(정상)입니다. `SrcValid+`가 보이면 활성입니다.
-BIOS에서 끄거나, 부팅 스크립트로 PCIe 스위치마다 해제해야 합니다.
+**GBS가 256인 이유**
 
-**E: IOMMU.** 켜져 있으면 `iommu=pt`(passthrough)여야 GDR이 삽니다.
+```
+WORLD = 8 GPU x 2 node = 16
+DP    = WORLD / (TP x PP x CP) = 16 / 8 = 2
+GBS는 MBS(1) x DP(2) = 2 의 배수
+GBS=256 -> grad_accum = 128
+```
+
+단일 노드(GBS=128, DP=1)와 **스텝당 샘플 수가 같아집니다.** 비교하려면 이 값이 맞습니다.
+
+**로그에서 확인할 것**
+
+```
+[INFO] mode=multi nnodes=2 gpus_per_node=8 world_size_gpus=16
+[INFO] parallel: TP=8 PP=1 CP=1 -> DP=2 (world=16)
+[INFO] batch:    MBS=1 GBS=256 grad_accum=128
+[INFO] rank0=... (MASTER_ADDR source)
+[INFO] log_dir=/mgmt/server/...        <- 새 경로가 맞는지
+[CONTAINER] B300: NCCL_NET_PLUGIN=none ...
+++trainer.precision=bf16
+```
+
+런처가 자동으로 고른 RDMA 값도 같이 봐주세요. 프로브 때와 달라졌다면 그게 단서입니다.
+
+```
+NCCL_IB_HCA=...   NCCL_SOCKET_IFNAME=...
+```
+
+---
+
+## STEP 3 — 단일 노드와 비교
+
+멀티노드가 돌면 스케일링을 봅니다. **여기서 SHARP 부재가 처음 수치로 드러납니다.**
 
 ```bash
-ssh $N1 'cat /proc/cmdline; dmesg | grep -iE "iommu|dmar" | head -5'
+# 같은 조건 단일 노드 (비교 기준)
+MLPERF_TRAIN_IMAGE_TAR=$TAR \
+./scripts/run_single_node.sh --host $N1 \
+  --benchmark llama31_8b --docker-image $IMG \
+  --tp 8 --pp 1 --mbs 1 --gbs 128 --max-steps 10
 ```
 
-`intel_iommu=on`만 있고 `iommu=pt`가 없으면 커널 파라미터에 추가 후 재부팅.
+스텝 시간을 비교하세요. 2노드가 1노드보다 **크게 느리면** 노드 간 통신이 병목입니다.
+그 경우 `NCCL_DEBUG=INFO`로 실제 경로가 IB인지(Socket으로 떨어지지 않았는지) 확인합니다.
 
 ---
 
-## STEP 6 — F: HCA 목록 정리 (앞이 다 실패했을 때)
+## STEP 4 — 회신
 
-이전 로그에 **IB와 RoCE가 섞여** 있었습니다.
-
-```
-[0]mlx5_0:1/IB/SHARP  [1]mlx5_1:1/IB/SHARP  [2]mlx5_2:1/RoCE  [3]mlx5_3:1/RoCE
-[4..11] IB/SHARP      [12]mlx5_12:1/RoCE    [13]mlx5_13:1/RoCE  [14][15] IB/SHARP
-```
-
-`mlx5_2, 3, 12, 13`이 RoCE입니다. IB만 남깁니다.
-
-```bash
-env $COMMON \
-NCCL_IB_HCA='mlx5_0,mlx5_1,mlx5_4,mlx5_5,mlx5_6,mlx5_7,mlx5_8,mlx5_9,mlx5_10,mlx5_11,mlx5_14,mlx5_15' \
-./scripts/nccl_probe.sh --hosts $N1,$N2 --image $IMG
-```
+1. STEP 2 — 스텝이 도는지, `log_dir`이 새 경로로 찍히는지
+2. STEP 3 — 1노드 대비 2노드 스텝 시간
+3. ACS를 BIOS로 영구화했는지 / systemd로 했는지
 
 ---
 
-## STEP 7 — NCCL 없이 GDR만 직접 재는 법 (선택)
+## 남은 이슈
 
-`ib_write_bw`를 **GPU 메모리로** 돌리면 NCCL을 빼고 GDR만 시험할 수 있습니다.
-(perftest가 CUDA 지원으로 빌드돼 있어야 합니다.)
-
-```bash
-# 서버 쪽
-ssh $N2 "docker run --rm --gpus all --network=host \
-  \$(for d in /dev/infiniband/*; do printf ' --device %s' \$d; done) \
-  $IMG ib_write_bw -d mlx5_0 --use_cuda=0"
-
-# 클라이언트 쪽
-ssh $N1 "docker run --rm --gpus all --network=host \
-  \$(for d in /dev/infiniband/*; do printf ' --device %s' \$d; done) \
-  $IMG ib_write_bw -d mlx5_0 --use_cuda=0 $N2"
-```
-
-`--use_cuda` 없이 되고 **있이 실패하면 GDR 문제 확정**입니다.
-NCCL을 완전히 배제한 증거라 벤더 문의할 때 쓰기 좋습니다.
+| 항목 | 상태 |
+|---|---|
+| **SHARP 부재** | B300은 HPC-X 플러그인을 끄므로 in-network reduction 없음. 멀티노드 allreduce가 느립니다. 정식 측정 전에 이미지 교체 여부를 정해야 합니다 |
+| `NCCL_IB_DISABLE=1` 무시됨 | 진단 중 발견. 지금 막히는 건 없지만 원인 미상 |
+| llama2_70b_lora | 아직 B300에서 안 돌려봤습니다. 8b가 되면 그다음 |
 
 ---
 
-## 참고 — Socket은 쓰지 않습니다
+## 이 건에서 고친 것들
 
-Socket 성공은 **진단 결과일 뿐**입니다. "NCCL과 노드 간 경로 자체는 멀쩡하고,
-IB의 GPU 메모리 등록만 깨졌다"를 증명한 것이지 대안이 아닙니다.
-
-노드 간 대역폭이 IB 대비 크게 떨어져 멀티노드 스케일링 수치가 의미 없어지므로
-**벤치마크에는 쓰지 않습니다.** 실행 스크립트에도 반영하지 않았습니다.
-
-> 확인: `mlperf_train_v51.sh` / `v41.sh` / `run_*.sh` 어디에도 `NCCL_NET=Socket`이나
-> `NCCL_SOCKET_IFNAME` 기본값은 없습니다. 값을 설정하는 곳은 B300의
-> `NCCL_NET_PLUGIN=none` 하나뿐이고, 나머지 `NCCL_*`는 **직접 줬을 때만 전달**되는
-> allowlist 항목입니다. `mlperf_run.sh`의 `NCCL_IB_HCA` / `NCCL_IB_DISABLE=0` /
-> `NCCL_SOCKET_IFNAME`은 원본 zip 그대로인 IB 자동 바인딩 코드입니다.
-
-멀티노드 학습은 **IB가 살아난 뒤에** 돌립니다.
-
----
-
-## 회신
-
-`Errors`에 붙여주세요.
-
-1. STEP 1 — `acs_check.sh` 결과 (**지금 가장 유력**), 해제 후 프로브 결과
-2. STEP 2 — `NCCL_NET_GDR_LEVEL=LOC` 통과 여부
-3. STEP 3 — `NCCL_DMABUF_ENABLE=0` 통과 여부
-4. STEP 4·5 — `nvidia_peermem`, BAR1 용량, `/proc/cmdline`
-
-STEP 1에서 ACS가 켜져 있으면 거기서 끝날 가능성이 높습니다.
-
----
-
-## 따로 확인 중인 것 — `NCCL_IB_DISABLE=1`이 안 먹었습니다
-
-2번째 시도에서 `NCCL_IB_DISABLE=1`을 줬는데도 `transport/net_ib.cc` 경고가 계속 나왔습니다.
-전달은 됐을 텐데 NCCL이 무시한 모양입니다. `NCCL_NET=Socket`으로는 의도대로 됐으니
-당장 막히는 건 없지만, 짚어두겠습니다. STEP 1·2 로그에서 같이 보겠습니다.
-
----
-
-## 알려진 미해결 — 로그 저장 위치
-
-`log_dir`이 GPU 노드의 `/opt/poc-platform/mlperf_logs_train_v51/...`로 갑니다.
-컨테이너 내부 경로가 아니라 **GPU 노드의 실제 경로**입니다 (같은 경로로 bind-mount됨).
-
-`--log-root` 플래그는 이미 있지만 기본값이 스크립트에 박혀 있어 `.env`로는 못 바꿉니다.
-`.env`에서 지정 가능하게 고치겠습니다. 그전까지는 이렇게 넘기면 됩니다.
-
-```bash
-./scripts/run_multi_node.sh ... --log-root /mgmt/server/poc-platform/mlperf_logs_train_v51
-```
+| 커밋 | 내용 |
+|---|---|
+| `d4a11f3` | llama31_8b 정밀도 — `bf16-mixed` → `bf16` |
+| `19cad5e` | TP=1일 때 sequence parallelism 자동 해제 |
+| `76a7fc8` | `MLPERF_TRAIN_IMAGE_TAR`로 이미지에 맞는 tar 지정 |
+| `489dc11` | **B300에서 `NCCL_NET_PLUGIN=none`** — SIGSEGV 원인 해결 |
+| `a3d213a`, `2599300` | `nccl_probe.sh` — NCCL만 30초 검증, 단일/멀티 |
+| `a4fa8b6` | `acs_check.sh` — **IB 실패 원인 규명** |
+| `14c29a1` | 로그 루트를 `.env`에서 지정 가능하게 |
 
 ---
 
@@ -326,11 +202,10 @@ STEP 1에서 ACS가 켜져 있으면 거기서 끝날 가능성이 높습니다.
 
 | 항목 | 결과 |
 |---|---|
-| 단일 노드 학습 8장 | **통과** |
-| 멀티노드 NCCL (Socket) | **통과 — 16 GPU all-reduce** |
-| 멀티노드 NCCL (IB) | 실패 — `status=4` local protection error |
-| `ib_write_bw` | 통과. 단 **호스트 메모리 기준**이라 GDR 검증 아님 |
-| 이전 SIGSEGV 원인 | HPC-X `libnccl-net.so` ↔ NCCL 2.28.3 불일치 |
-| 그 해결 | `NCCL_NET_PLUGIN=none` (B300 기본값, `489dc11`) |
+| 단일 노드 학습 8장 | 통과 |
+| 멀티노드 NCCL (IB, GDR 켬) | **통과 — ACS 해제 후** |
+| IB 실패 원인 | **PCIe ACS**. `status=4` = local protection error |
+| SIGSEGV 원인 | HPC-X `libnccl-net.so` ↔ NCCL 2.28.3 불일치 |
 | 드라이버 | 580.173.02 (r580) — 정상 |
+| `ib_write_bw` | 호스트 메모리 기준이라 GDR 검증이 아니었음 |
 | 호스트 NCCL / HPC-X | 컨테이너와 무관 |
