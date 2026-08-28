@@ -1,6 +1,7 @@
 # 플랫폼 띄우고 테스트하기
 
 `start_platform.sh` 로 플랫폼을 올리고, 브라우저에서 실제 run 을 돌려 확인하는 순서입니다.
+노드 자체 점검은 `node_check.sh` / `nccl_probe.sh` 로 따로 합니다(5절 참고).
 
 ---
 
