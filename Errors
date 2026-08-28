@@ -1,4 +1,61 @@
 # 클러스터 1 에러 - hostfile에 8노드 지정함
+[node25] node-26049:295:295 [4] NCCL INFO Connected NVLS tree
+[node24] node-26048:295:295 [4] NCCL INFO Connected NVLS tree
+[node20] node-26044:295:295 [4] NCCL INFO Connected NVLS tree
+[node23] node-26047:295:295 [4] NCCL INFO Connected NVLS tree
+[node21] node-26045:295:295 [4] NCCL INFO Connected NVLS tree
+[node20] node-26044:291:291 [0] NCCL INFO Connected NVLS tree
+[node24] node-26048:291:291 [0] NCCL INFO Connected NVLS tree
+[node21] node-26045:291:291 [0] NCCL INFO Connected NVLS tree
+[node23] node-26047:291:291 [0] NCCL INFO Connected NVLS tree
+[node19] node-26043:298:298 [4] NCCL INFO Connected NVLS tree
+[node26] node-26050:296:296 [4] NCCL INFO Connected NVLS tree
+[node26] node-26050:292:292 [0] NCCL INFO Connected NVLS tree
+[node19] node-26043:294:294 [0] NCCL INFO Connected NVLS tree
+[node25] node-26049:291:291 [0] NCCL INFO Connected NVLS tree
+[node20] node-26044:293:293 [2] NCCL INFO Connected NVLS tree
+[node24] node-26048:293:293 [2] NCCL INFO Connected NVLS tree
+[node21] node-26045:293:293 [2] NCCL INFO Connected NVLS tree
+[node23] node-26047:293:293 [2] NCCL INFO Connected NVLS tree
+[node25] node-26049:293:293 [2] NCCL INFO Connected NVLS tree
+[node26] node-26050:294:294 [2] NCCL INFO Connected NVLS tree
+[node19] node-26043:296:296 [2] NCCL INFO Connected NVLS tree
+[node20] node-26044:297:297 [6] NCCL INFO Connected NVLS tree
+[node25] node-26049:297:297 [6] NCCL INFO Connected NVLS tree
+[node23] node-26047:297:297 [6] NCCL INFO Connected NVLS tree
+[node21] node-26045:297:297 [6] NCCL INFO Connected NVLS tree
+[node19] node-26043:300:300 [6] NCCL INFO Connected NVLS tree
+[node24] node-26048:297:297 [6] NCCL INFO Connected NVLS tree
+[node26] node-26050:298:298 [6] NCCL INFO Connected NVLS tree
+[node24] node-26048:292:292 [1] NCCL INFO Connected NVLS tree
+[node20] node-26044:292:292 [1] NCCL INFO Connected NVLS tree
+[node25] node-26049:292:292 [1] NCCL INFO Connected NVLS tree
+[node26] node-26050:293:293 [1] NCCL INFO Connected NVLS tree
+[node19] node-26043:295:295 [1] NCCL INFO Connected NVLS tree
+[node23] node-26047:292:292 [1] NCCL INFO Connected NVLS tree
+[node21] node-26045:292:292 [1] NCCL INFO Connected NVLS tree
+[node24] node-26048:298:298 [7] NCCL INFO Connected NVLS tree
+[node21] node-26045:298:298 [7] NCCL INFO Connected NVLS tree
+[node23] node-26047:298:298 [7] NCCL INFO Connected NVLS tree
+[node20] node-26044:298:298 [7] NCCL INFO Connected NVLS tree
+[node25] node-26049:298:298 [7] NCCL INFO Connected NVLS tree
+[node19] node-26043:301:301 [7] NCCL INFO Connected NVLS tree
+[node26] node-26050:299:299 [7] NCCL INFO Connected NVLS tree
+[node20] node-26044:296:296 [5] NCCL INFO Connected NVLS tree
+[node20] node-26044:294:294 [3] NCCL INFO Connected NVLS tree
+[node21] node-26045:296:296 [5] NCCL INFO Connected NVLS tree
+[node23] node-26047:296:296 [5] NCCL INFO Connected NVLS tree
+[node24] node-26048:296:296 [5] NCCL INFO Connected NVLS tree
+[node25] node-26049:296:296 [5] NCCL INFO Connected NVLS tree
+[node26] node-26050:297:297 [5] NCCL INFO Connected NVLS tree
+[node25] node-26049:294:294 [3] NCCL INFO Connected NVLS tree
+[node21] node-26045:294:294 [3] NCCL INFO Connected NVLS tree
+[node23] node-26047:294:294 [3] NCCL INFO Connected NVLS tree
+[node19] node-26043:297:297 [3] NCCL INFO Connected NVLS tree
+[node24] node-26048:294:294 [3] NCCL INFO Connected NVLS tree
+[node26] node-26050:295:295 [3] NCCL INFO Connected NVLS tree
+[node19] node-26043:299:299 [5] NCCL INFO Connected NVLS tree
+
 ====================================================================
 PER-HOST RESULT
 ====================================================================
@@ -20,6 +77,15 @@ PER-HOST RESULT
 
 
 # 클러스터 2 에러 - hostfile에 3노드 지정
+[node28] node-26052:294:294 [1] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
+[node28] node-26052:300:300 [7] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
+[node28] node-26052:296:296 [3] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
+[node28] node-26052:299:299 [6] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
+[node28] node-26052:295:295 [2] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
+[node28] node-26052:298:298 [5] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
+[node28] node-26052:297:297 [4] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
+[node28] node-26052:293:293 [0] NCCL INFO Connected all rings, use ring PXN 0 GDR 1
+
 ====================================================================
 PER-HOST RESULT
 ====================================================================
