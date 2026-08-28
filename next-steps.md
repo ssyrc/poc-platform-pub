@@ -83,7 +83,7 @@ git pull
 N1=node19
 N2=node20
 IMG=registry.internal/proxy-docker-registry-1.docker.io/donnmyth/mlperf-nvidia:llama31_8b-pyt-blackwell
-TAR=/mgmt/server/poc-platform/data/dockerimgs/llama31_8b_pyt-blackwell.tar
+TAR=/mgmt/server/poc-platform/data/dockerimgs/llama31_8b-pyt-blackwell.tar
 ```
 
 ---
