@@ -165,6 +165,50 @@ else
   echo "[INFO] env into container: <none>"
 fi
 
+# A node that cannot reach the rendezvous address never joins, and the symptom
+# is a short world with nothing said about which node or why. Check it here,
+# where the answer is one line per host.
+#
+# The distinction that matters is refused vs timed out. Nothing is listening on
+# the endpoint yet, so a refused connection is the good case: the packet got
+# there and came back. A timeout means it never arrived -- routing, a firewall,
+# or a different segment.
+if (( NNODES > 1 )); then
+  echo "[INFO] checking ${MASTER_ADDR}:${MASTER_PORT} is reachable from every host"
+  rdzv_bad=0
+  for h in "${HOSTS[@]}"; do
+    out="$(cm_remote_bash "$h" "$MASTER_ADDR" "$MASTER_PORT" <<'REACH' 2>/dev/null
+target="$1"; port="$2"
+route="$(ip route get "$target" 2>/dev/null | head -1 | sed 's/  */ /g')"
+timeout 5 bash -c "exec 3<>/dev/tcp/${target}/${port}" 2>/dev/null
+rc=$?
+case "$rc" in
+  0)   verdict="listening" ;;   # something already bound; routable either way
+  124) verdict="TIMEOUT" ;;     # never got there
+  *)   verdict="refused" ;;     # got there, nothing listening yet -- expected
+esac
+printf '%s|%s\n' "$verdict" "${route:-no route}"
+REACH
+)"
+    out="$(printf '%s' "$out" | tail -1 | tr -d '\r')"
+    verdict="${out%%|*}"; route="${out#*|}"
+    case "$verdict" in
+      refused|listening) printf '  %-20s ok (%s)  via %s\n' "$h" "$verdict" "$route" ;;
+      *)                 printf '  %-20s [FAIL] %s  via %s\n' "$h" "$verdict" "$route" >&2; rdzv_bad=1 ;;
+    esac
+  done
+  if (( rdzv_bad )); then
+    echo >&2
+    echo "[ERROR] some hosts cannot reach ${MASTER_ADDR}:${MASTER_PORT}." >&2
+    echo "[ERROR] Those are the ones that will be missing from the world." >&2
+    echo "[ERROR] Compare the 'via' routes above: a host that leaves by a" >&2
+    echo "[ERROR] different interface than the others is on another segment." >&2
+    echo "[ERROR] Set --master-addr to an address every host shares, or open" >&2
+    echo "[ERROR] port ${MASTER_PORT} between them." >&2
+    exit 64
+  fi
+fi
+
 # A host whose docker run fails never joins, and the others then sit in the
 # rendezvous until rank 0 gives up -- reported as RendezvousTimeoutError and
 # broken pipes, naming nobody. Load the image everywhere first.
