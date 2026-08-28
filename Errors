@@ -1,3 +1,56 @@
+# 클러스터 1 -8노드
+## 장애나는 노드 27번 에러
+[node25] node-26049:291:291 [0] NCCL INFO comm 0xb10fe50 rank 40 nranks 56 cudaDev 0 busId 1a000 - Destroy COMPLETE
+[node27] [W828 15:34:18.369398949 socket.cpp:460] [c10d] waitForInput: poll for socket SocketImpl(fd=44, addr=[node-26051]:52864, remote=[node-26043]:29500) returned 0, likely a timeout
+[node27] [W828 15:34:18.369441939 socket.cpp:485] [c10d] waitForInput: socket SocketImpl(fd=44, addr=[node-26051]:52864, remote=[node-26043]:29500) timed out after 60000ms
+[node27] Traceback (most recent call last):
+[node27]   File "/usr/local/bin/torchrun", line 7, in <module>
+[node27]     sys.exit(main())
+[node27]              ^^^^^^
+[node27]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 357, in wrapper
+[node27]     return f(*args, **kwargs)
+[node27]            ^^^^^^^^^^^^^^^^^^
+[node27]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 936, in main
+[node27]     run(args)
+[node27]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/run.py", line 927, in run
+[node27]     elastic_launch(
+[node27]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 151, in __call__
+[node27]     return launch_agent(self._config, self._entrypoint, list(args))
+[node27]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[node27]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/launcher/api.py", line 279, in launch_agent
+[node27]     result = agent.run()
+[node27]              ^^^^^^^^^^^
+[node27]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/metrics/api.py", line 138, in wrapper
+[node27]     result = f(*args, **kwargs)
+[node27]              ^^^^^^^^^^^^^^^^^^
+[node27]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/agent/server/api.py", line 724, in run
+[node27]     result = self._invoke_run(role)
+[node27]              ^^^^^^^^^^^^^^^^^^^^^^
+[node27]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/agent/server/api.py", line 882, in _invoke_run
+[node27]     self._initialize_workers(self._worker_group)
+[node27]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/metrics/api.py", line 138, in wrapper
+[node27]     result = f(*args, **kwargs)
+[node27]              ^^^^^^^^^^^^^^^^^^
+[node27]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/agent/server/api.py", line 692, in _initialize_workers
+[node27]     self._rendezvous(worker_group)
+[node27]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/metrics/api.py", line 138, in wrapper
+[node27]     result = f(*args, **kwargs)
+[node27]              ^^^^^^^^^^^^^^^^^^
+[node27]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/agent/server/api.py", line 520, in _rendezvous
+[node27]     workers = self._assign_worker_ranks(
+[node27]               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+[node27]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/metrics/api.py", line 138, in wrapper
+[node27]     result = f(*args, **kwargs)
+[node27]              ^^^^^^^^^^^^^^^^^^
+[node27]   File "/usr/local/lib/python3.12/dist-packages/torch/distributed/elastic/agent/server/api.py", line 657, in _assign_worker_ranks
+[node27]     ) = json.loads(store.get(f"{ASSIGNED_RANKS_PREFIX}{group_rank}"))
+[node27]                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[node27] torch.distributed.DistStoreError: wait timeout after 60000ms, keys: /torch.rendezvous.none.0/torchelastic/assigned_ranks/7
+[node27] + rm -rf /tmp/tmp.ZPB4alnbni
+
+
+
+# 클러스터 2 - 3노드
 [node30] [W828 15:33:20.851711630 TCPStore.cpp:138] [c10d] recvValueWithTimeout failed on SocketImpl(fd=45, addr=[node-26054]:57350, remote=[node-26052]:29500): Failed to recv, got 0 bytes. Connection was likely closed. Did the remote server shutdown or crash?
 [node30] Exception raised from recvBytes at /opt/pytorch/pytorch/torch/csrc/distributed/c10d/Utils.hpp:682 (most recent call first):
 [node30] frame #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x88 (0x7f1ba997fd98 in /usr/local/lib/python3.12/dist-packages/torch/lib/libc10.so)
