@@ -130,6 +130,65 @@ echo "[INFO] mode=multi nnodes=${NNODES} gpus_per_node=${GPUS} world_size_gpus=$
 echo "[INFO] rank0=${FIRST} (MASTER_ADDR source) hosts=${HOSTS[*]}"
 echo "[INFO] version=${VERSION} benchmark=${BENCHMARK} gpu_type=${GPU_TYPE} run_id=${RUN_ID}"
 
+# Every host has to be able to obtain the image. Without this the run starts,
+# the hosts that have it get as far as launching a container, and the one that
+# does not dies with "Docker image missing and fallback-load/pull failed" --
+# after the others are already up. Check first and name the host.
+#
+# Only what this wrapper actually knows is checked: the image when --docker-image
+# was given, and the tar when MLPERF_TRAIN_IMAGE_TAR was. Picking the default
+# image is the launcher's job and depends on gpu type and benchmark, so it is
+# not second-guessed here.
+USER_IMAGE=""
+for i in "${!PASSTHRU[@]}"; do
+  if [[ "${PASSTHRU[$i]}" == "--docker-image" ]]; then
+    USER_IMAGE="${PASSTHRU[$((i+1))]:-}"
+    break
+  fi
+done
+
+if [[ -n "$USER_IMAGE" || -n "${MLPERF_TRAIN_IMAGE_TAR:-}" ]]; then
+  echo "[INFO] checking image availability on ${NNODES} host(s)"
+  image_fail=0
+  for h in "${HOSTS[@]}"; do
+    verdict="$(cm_remote_bash "$h" <<CHECK || true
+img="${USER_IMAGE}"
+tar="${MLPERF_TRAIN_IMAGE_TAR:-}"
+dirs="${POC_PLATFORM_DOCKERIMG_DIRS:-}"
+
+if [[ -n "\$img" ]] && docker image inspect "\$img" >/dev/null 2>&1; then
+  echo "loaded"; exit 0
+fi
+if [[ -n "\$tar" && -r "\$tar" ]]; then
+  echo "tar:\$tar"; exit 0
+fi
+if [[ -n "\$tar" && -n "\$dirs" ]]; then
+  base="\$(basename "\$tar")"
+  IFS=':' read -ra dd <<< "\$dirs"
+  for d in "\${dd[@]}"; do
+    [[ -n "\$d" && -r "\${d}/\${base}" ]] && { echo "tar:\${d}/\${base}"; exit 0; }
+  done
+fi
+echo "MISSING"
+CHECK
+)"
+    verdict="$(echo "$verdict" | tail -1 | tr -d '\r')"
+    case "$verdict" in
+      loaded)  echo "  ${h}: image already loaded" ;;
+      tar:*)   echo "  ${h}: will load from ${verdict#tar:}" ;;
+      *)       echo "  ${h}: [MISSING] no image and no readable tar" >&2; image_fail=1 ;;
+    esac
+  done
+  if (( image_fail )); then
+    echo >&2
+    echo "[ERROR] at least one host cannot obtain the image; not starting the run." >&2
+    echo "[ERROR] on each host marked MISSING, either:" >&2
+    echo "[ERROR]   ssh <host> \"docker load -i ${MLPERF_TRAIN_IMAGE_TAR:-<tar>}\"" >&2
+    echo "[ERROR]   or make the tar readable there and set POC_PLATFORM_DOCKERIMG_DIRS" >&2
+    exit 24
+  fi
+fi
+
 # Multi node: world size spans every rank, so TP x PP x CP may exceed one node.
 train_params_validate "$WORLD" "$GPUS"
 train_params_export

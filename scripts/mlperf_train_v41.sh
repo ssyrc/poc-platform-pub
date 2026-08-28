@@ -549,6 +549,18 @@ ensure_image() {
     return 0
   fi
 
+  {
+    echo "[ERROR] could not obtain image on $(hostname -s 2>/dev/null || echo "this host"): $image"
+    echo "[ERROR]   tar tried:  ${2:-<none>}"
+    if [[ -n "${POC_PLATFORM_DOCKERIMG_DIRS:-}" ]]; then
+      echo "[ERROR]   also searched by basename in: ${POC_PLATFORM_DOCKERIMG_DIRS}"
+    else
+      echo "[ERROR]   POC_PLATFORM_DOCKERIMG_DIRS unset (no extra tar dirs searched)"
+    fi
+    echo "[ERROR]   docker pull also failed (expected on an air-gapped node)"
+    echo "[ERROR] fix: stage the tar on this host and 'docker load -i <tar>', or"
+    echo "[ERROR]      set POC_PLATFORM_DOCKERIMG_DIRS to where it is readable here"
+  } >&2
   fail_run "Docker image missing and fallback-load/pull failed: $image" 24
 }
 
