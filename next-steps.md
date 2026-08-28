@@ -246,6 +246,85 @@ PP는 모델이 안 들어갈 때 쓰는 카드이고, llama31_8b는 TP=8로 충
 
 ---
 
+## RoCE로 테스트해보기 (CLI 전용)
+
+플랫폼 UI는 건드리지 않습니다. 전부 환경변수로만 됩니다.
+
+이 노드의 `mlx5_2, 3, 12, 13`이 RoCE이고 나머지 12개가 IB/SHARP입니다.
+**한 job에서 IB와 RoCE를 섞으면 안 됩니다.** RoCE만 남겨야 합니다.
+
+### 1. GID 인덱스 확인
+
+RoCE는 IB와 달리 **어느 GID를 쓸지** 정해야 합니다. RoCEv2/IPv4를 골라야 합니다.
+
+```bash
+ssh $N1 'show_gids mlx5_2' 2>/dev/null || \
+ssh $N1 'for i in $(seq 0 7); do
+  printf "gid %d: %s %s\n" "$i" \
+    "$(cat /sys/class/infiniband/mlx5_2/ports/1/gid_attrs/types/$i 2>/dev/null)" \
+    "$(cat /sys/class/infiniband/mlx5_2/ports/1/gids/$i 2>/dev/null)"
+done'
+```
+
+`RoCE v2` + IPv4-mapped 주소(`::ffff:a.b.c.d`)인 인덱스를 씁니다. 흔히 3번입니다.
+
+### 2. 프로브로 먼저 (30초)
+
+NCCL 2.28은 GID를 자동 선택하는 경우가 많으니, **일단 안 주고** 해보세요.
+
+```bash
+ROCE='mlx5_2,mlx5_3,mlx5_12,mlx5_13'
+
+NCCL_NET_PLUGIN=none NCCL_DEBUG=INFO NCCL_DEBUG_SUBSYS=INIT,NET \
+NCCL_IB_HCA=$ROCE \
+UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
+./scripts/nccl_probe.sh --hosts $N1,$N2 --image $IMG
+```
+
+로그에서 `RoCE`로 잡혔는지 확인합니다.
+
+```
+NCCL INFO NET/IB : Using [0]mlx5_2:1/RoCE ...
+```
+
+실패하면 GID를 명시합니다.
+
+```bash
+NCCL_IB_GID_INDEX=3   # 위에서 확인한 값
+```
+
+그래도 안 되면 QoS 쪽입니다. RoCE는 스위치에 **PFC/ECN이 잡혀 있어야** 제대로 돕니다.
+
+```bash
+NCCL_IB_TC=106        # DSCP 26 (=TC 106) 이 흔한 관례
+NCCL_IB_SL=3
+```
+
+### 3. 학습에 적용
+
+프로브가 통과한 조합을 그대로 앞에 붙이면 됩니다. 스크립트 수정 불필요합니다.
+
+```bash
+NCCL_IB_HCA=$ROCE NCCL_IB_GID_INDEX=3 \
+UCX_HANDLE_ERRORS=none UCX_ERROR_SIGNALS= PYTHONFAULTHANDLER=1 \
+MLPERF_TRAIN_IMAGE_TAR=$TAR \
+./scripts/run_multi_node.sh --hosts $HOSTS \
+  --benchmark llama31_8b --docker-image $IMG \
+  --tp 8 --pp 1 --cp 1 --mbs 1 --gbs 1024 --max-steps 10
+```
+
+`NCCL_IB_HCA`를 직접 주면 런처의 자동 탐지보다 **우선합니다** (`${NCCL_IB_HCA:-$auto_hca}`).
+
+### 미리 알아둘 것
+
+- **RoCE는 IB보다 느립니다.** 이 노드는 IB가 12개, RoCE가 4개라 링크 수부터 3배 차이입니다.
+  성능 비교가 목적이면 그 점을 감안하세요.
+- **PFC/ECN이 스위치에 안 잡혀 있으면** 패킷 드롭으로 재전송이 생겨 성능이 크게 떨어지거나
+  아예 hang 합니다. IB처럼 그냥 되지 않습니다.
+- SHARP는 RoCE 경로에서 못 씁니다 (어차피 지금 플러그인을 꺼서 IB에서도 안 쓰고 있습니다).
+
+---
+
 ## 무시해도 되는 경고
 
 ### `NET/IB : Cannot use physical device 18, max 16`
