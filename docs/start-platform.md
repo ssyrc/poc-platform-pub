@@ -27,8 +27,8 @@ vi .env
 | `MLPERF_HOSTFILE` | CLI 기본 hostfile | 없음 (플래그로 지정) |
 | `MLPERF_NET_H_HPC_JUMP` | H HPC센터 경유 체인 | H망 노드에 붙지 못함 |
 
-**H B300 을 쓰려면** 이 두 줄이 반드시 있어야 합니다. 플랫폼(S, `platform`)에서
-`node*` 로 바로 가는 경로가 없고, bastion 두 단을 거쳐야 합니다.
+**H B300 을 쓰려면** 이 두 줄이 반드시 있어야 합니다. 플랫폼은 S망에 있고 H망 노드로 바로 가는 경로가
+없어, bastion 두 단을 거쳐야 합니다.
 
 ```bash
 MLPERF_NET_H_HPC_JUMP=root@bastion1,root@bastion2
@@ -99,10 +99,10 @@ dev 에서 표를 고쳐도 8100 에는 영향이 없습니다.
 
 ```bash
 # S 슈퍼컴 로그인 노드를 거쳐 (평소)
-ssh -J <로그인노드> -L 8100:localhost:8100 root@platform
+ssh -J <로그인노드> -L 8100:localhost:8100 root@<플랫폼 서버>
 
 # 플랫폼 자체가 H망 뒤에 있을 때
-ssh -J root@bastion1,root@bastion2 -L 8100:localhost:8100 root@bastion2
+ssh -J root@bastion1,root@bastion2 -L 8100:localhost:8100 root@<플랫폼 서버>
 ```
 
 그리고 `http://localhost:8100`.

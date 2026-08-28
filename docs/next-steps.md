@@ -17,8 +17,8 @@ cd /opt/poc-platform/poc-platform-latest
 cp .env.example .env
 ```
 
-**H B300 을 쓸 거면 이 두 줄이 필수입니다.** S(`platform`)에서 `node*` 로
-직접 가는 경로가 없습니다.
+**H B300 을 쓸 거면 이 두 줄이 필수입니다.** 플랫폼이 있는 S망에서 H망 노드로 직접 가는
+경로가 없습니다.
 
 ```bash
 MLPERF_NET_H_HPC_JUMP=root@bastion1,root@bastion2
@@ -53,7 +53,7 @@ curl -s localhost:8100/api/config | python3 -m json.tool | head -40   # scripts_
 ### 4. 브라우저
 
 ```bash
-ssh -J <로그인노드> -L 8100:localhost:8100 root@platform
+ssh -J <로그인노드> -L 8100:localhost:8100 root@<플랫폼 서버>
 ```
 
 → `http://localhost:8100`
