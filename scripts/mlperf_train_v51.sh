@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${_LIB_DIR}/lib_ssh.sh"
+
 usage() {
   cat <<'EOF'
 Usage:
@@ -121,7 +125,8 @@ remote_bash() {
   if is_local_host "$HOST"; then
     bash -s -- "$@"
   else
-    ssh -o BatchMode=yes -o ConnectTimeout=8 "$HOST" bash -s -- "$@"
+    local -a _sopt; ssh_opts_for _sopt "$HOST"
+    ssh ${_sopt[@]+"${_sopt[@]}"} -o BatchMode=yes -o ConnectTimeout=8 "$HOST" bash -s -- "$@"
   fi
 }
 
@@ -165,7 +170,7 @@ esac
 
 if ! is_local_host "$HOST"; then
   echo "[INFO] checking SSH reachability: ${HOST}"
-  ssh -o BatchMode=yes -o ConnectTimeout=8 "$HOST" "echo ok" >/dev/null 2>&1 || die "SSH unreachable: $HOST"
+  ssh_opts_for _sopt "$HOST"; ssh_describe_route "$HOST"; ssh ${_sopt[@]+"${_sopt[@]}"} -o BatchMode=yes -o ConnectTimeout=8 "$HOST" "echo ok" >/dev/null 2>&1 || die "SSH unreachable: $HOST"
 fi
 
 # Advanced MLPerf args arrive as environment variables from backend/runner.py.

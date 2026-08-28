@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "${_LIB_DIR}/lib_ssh.sh"
+
 usage() {
   cat <<'EOU'
 Usage:
@@ -80,7 +84,9 @@ case "$BENCHMARK" in llama2_70b) ;; *) die "Inference v6.0 supports only benchma
 SAFE_RUN_ID="$(printf '%s' "$RUN_ID" | tr -c 'A-Za-z0-9_.-' '_')"; CONTAINER_NAME="mlperf_infer_v60_${SAFE_RUN_ID}"
 LOCAL_SHORT="$(hostname -s 2>/dev/null || hostname)"; LOCAL_FQDN="$(hostname -f 2>/dev/null || hostname)"
 is_local_host(){ [[ "$1" == "localhost" || "$1" == "127.0.0.1" || "$1" == "$LOCAL_SHORT" || "$1" == "$LOCAL_FQDN" ]]; }
-remote_bash(){ if is_local_host "$HOST"; then bash -s -- "$@"; else ssh -o BatchMode=yes -o ConnectTimeout=8 "$HOST" bash -s -- "$@"; fi; }
+remote_bash(){ if is_local_host "$HOST"; then bash -s -- "$@"; else
+  local -a _sopt; ssh_opts_for _sopt "$HOST"
+  ssh ${_sopt[@]+"${_sopt[@]}"} -o BatchMode=yes -o ConnectTimeout=8 "$HOST" bash -s -- "$@"; fi; }
 if [[ "$MODE" == "stop" ]]; then
   echo "[PHASE] stop"
   remote_bash "$CONTAINER_NAME" <<'REMOTE_STOP'
@@ -94,7 +100,7 @@ REMOTE_STOP
   echo "[PHASE] done"; exit 0
 fi
 [[ -n "$GPU_TYPE" ]] || die "--gpu-type is required"
-if ! is_local_host "$HOST"; then echo "[INFO] checking SSH reachability: ${HOST}"; ssh -o BatchMode=yes -o ConnectTimeout=8 "$HOST" "echo ok" >/dev/null 2>&1 || die "SSH unreachable: $HOST"; fi
+if ! is_local_host "$HOST"; then echo "[INFO] checking SSH reachability: ${HOST}"; ssh_opts_for _sopt "$HOST"; ssh_describe_route "$HOST"; ssh ${_sopt[@]+"${_sopt[@]}"} -o BatchMode=yes -o ConnectTimeout=8 "$HOST" "echo ok" >/dev/null 2>&1 || die "SSH unreachable: $HOST"; fi
 
 # Advanced inference args arrive as env vars from backend/runner.py.
 # SSH does not reliably preserve arbitrary env or multiline shell snippets, so

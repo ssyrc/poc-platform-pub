@@ -21,6 +21,8 @@
 
 COMMON_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMMON_PROJECT_DIR="$(cd "${COMMON_SCRIPT_DIR}/.." && pwd)"
+# shellcheck disable=SC1091
+source "${COMMON_SCRIPT_DIR}/lib_ssh.sh"
 ENV_FILE="${POC_PLATFORM_ENV_FILE:-${COMMON_PROJECT_DIR}/.env}"
 if [[ -f "$ENV_FILE" && "${POC_PLATFORM_ENV_LOADED:-0}" != "1" ]]; then
   set -a
@@ -91,7 +93,8 @@ cm_remote_bash() {
   if cm_is_local_host "$h"; then
     bash -s -- "$@"
   else
-    ssh -o BatchMode=yes -o ConnectTimeout=8 "$h" bash -s -- "$@"
+    local -a _sopt; ssh_opts_for _sopt "$h"
+    ssh ${_sopt[@]+"${_sopt[@]}"} -o BatchMode=yes -o ConnectTimeout=8 "$h" bash -s -- "$@"
   fi
 }
 
@@ -201,7 +204,8 @@ DOCKER_BOOTSTRAP
   } | if cm_is_local_host "$h"; then
     bash -s
   else
-    ssh -o BatchMode=yes -o ConnectTimeout=8 "$h" bash -s
+    local -a _sopt; ssh_opts_for _sopt "$h"
+    ssh ${_sopt[@]+"${_sopt[@]}"} -o BatchMode=yes -o ConnectTimeout=8 "$h" bash -s
   fi
 }
 
@@ -260,7 +264,8 @@ EOF
 cm_kubectl_available() {
   if cm_kubectl_via_ssh; then
     command -v ssh >/dev/null 2>&1 || return 1
-    ssh -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=no "$(cm_kubectl_target)" "$(cm_remote_kubectl_script version --client=true)" >/dev/null 2>&1
+    local -a _sopt; ssh_opts_for _sopt "$(cm_kubectl_target)"
+    ssh ${_sopt[@]+"${_sopt[@]}"} -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=no "$(cm_kubectl_target)" "$(cm_remote_kubectl_script version --client=true)" >/dev/null 2>&1
   else
     local k="${KUBECTL_BIN:-kubectl}"
     command -v "$k" >/dev/null 2>&1
@@ -270,7 +275,8 @@ cm_kubectl_available() {
 cm_kubectl() {
   local k="${KUBECTL_BIN:-kubectl}"
   if cm_kubectl_via_ssh; then
-    ssh -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=no "$(cm_kubectl_target)" "$(cm_remote_kubectl_script "$@")"
+    local -a _sopt; ssh_opts_for _sopt "$(cm_kubectl_target)"
+    ssh ${_sopt[@]+"${_sopt[@]}"} -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=no "$(cm_kubectl_target)" "$(cm_remote_kubectl_script "$@")"
   else
     export KUBECONFIG="${K8S_KUBECONFIG:-${KUBECONFIG:-}}"
     "$k" "$@"
