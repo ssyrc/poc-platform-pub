@@ -17,6 +17,9 @@ chmod +x start_platform.sh scripts/*.sh scripts/*/*.sh
 http://{서버ip}:8100
 ```
 
+`.env` 설정부터 브라우저 접속, dry-run/실제 run 까지의 전체 순서는
+[docs/start-platform.md](docs/start-platform.md)에 있습니다.
+
 ## 운영 배포 (systemd)
 
 `poc-platform-latest`(포트 8100, `http://{서버ip}:8100`)는 터미널 종료/재부팅에도 유지되도록

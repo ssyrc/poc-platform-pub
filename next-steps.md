@@ -1,14 +1,76 @@
 # Next Steps
 
-- 갱신: 2026-08-28 (23회차)
-- 상태: 단일 노드·2노드 학습 통과 / **멀티노드 rendezvous가 노드별로 따로 완료됨**
-- **지금 할 일: rendezvous 내부 로그 (`TORCH_DISTRIBUTED_DEBUG` 전달 수정 후)**
+- 갱신: 2026-08-28 (24회차)
+- 상태: 단일 노드·2노드 학습 통과 / 멀티노드 rendezvous는 **다른 분께 인계**
+- **지금 할 일: 플랫폼 기동 후 UI 로 end-to-end 테스트** → [docs/start-platform.md](docs/start-platform.md)
 
 ---
 
-## 지금 확정된 사실
+## 지금 할 일 — 플랫폼 띄우고 테스트
 
-5노드 실행 (`.26` rank0, `.27`, `.28`, `.29`, `.30`):
+가이드를 `docs/start-platform.md` 에 정리했습니다. 요약하면 이 순서입니다.
+
+### 1. `.env`
+
+```bash
+cd /opt/poc-platform/poc-platform-latest
+cp .env.example .env
+```
+
+**H B300 을 쓸 거면 이 두 줄이 필수입니다.** S(`platform`)에서 `node*` 로
+직접 가는 경로가 없습니다.
+
+```bash
+MLPERF_NET_H_HPC_JUMP=root@bastion1,root@bastion2
+MLPERF_NET_H_HPC_SSH_OPTS=-o ConnectTimeout=20
+```
+
+먼저 손으로 뚫리는지 확인 — 여기서 막히면 UI 도 똑같이 막힙니다.
+
+```bash
+ssh -J root@bastion1,root@bastion2 root@node26 hostname
+```
+
+### 2. 기동
+
+```bash
+systemctl restart poc-platform.service        # 운영 8100
+# 또는 손으로
+SKIP_PIP_INSTALL=1 PORT=8101 ./start_platform.sh
+```
+
+`start_platform.sh` 의 기본 포트는 **8089** 입니다. 8100/8101 은 systemd 가 `PORT` 를
+넣어 주는 값이라, 손으로 띄울 때는 직접 줘야 합니다.
+
+### 3. 확인
+
+```bash
+curl -s localhost:8100/api/health
+curl -s localhost:8100/api/config | python3 -m json.tool | head -40   # scripts_dir / data_root / state_dir
+./scripts/preflight.sh training v5.1
+```
+
+### 4. 브라우저
+
+```bash
+ssh -J <로그인노드> -L 8100:localhost:8100 root@platform
+```
+
+→ `http://localhost:8100`
+
+### 5. UI 테스트 순서
+
+1. `network` 버튼 → **H HPC센터** (B300 쓸 때)
+2. `hosts` 입력 → GPU 타입이 `B300` 으로 잡히면 **ssh 경로가 실제로 뚫린 것**
+3. **dry-run** 으로 한 번 → `--nnodes`, `MASTER_ADDR`, 유도된 GBS, 이미지 이름 확인
+4. 실제 run: **1노드 → 2노드** 순서로. `--gbs` 는 비워 두세요(노드 수에서 파생)
+5. 결과: Recent Runs / `/api/runs/<id>/report`
+
+---
+
+## 인계 — 멀티노드 rendezvous (미해결)
+
+5노드 실행에서 **선언한 것보다 작은 world 가 형성**됩니다.
 
 ```
 world formed: 16/40 ranks, 2/5 nodes
@@ -16,96 +78,40 @@ world formed: 16/40 ranks, 2/5 nodes
   rank host            exit   note
   0    node26    0      ok
   1    node27    0      ok
-  2    node28    1      DistNetworkError: Failed to recv, got 0 bytes...
+  2    node28    1      DistNetworkError: Failed to recv, got 0 bytes
   3    node29    1      DistNetworkError: ...
   4    node30    1      DistNetworkError: ...
 ```
 
-### 늦어서가 아닙니다 (배제)
-
-시작 시각을 보면 **가장 늦게 시작한 노드가 성공하고, 가장 먼저 시작한 노드가 실패**합니다.
-
-| 노드 | 시작 | 결과 |
-|---|---|---|
-| `.29` | 01:40:10 | **실패** (가장 이름) |
-| `.30` | 01:40:19 | 실패 |
-| `.28` | 01:40:41 | 실패 |
-| `.27` | **01:40:50** | **성공** (가장 늦음) |
-
-**성공한 것은 node_rank 0과 1**입니다. 시작 순서와 무관합니다.
-
-### `[LAUNCH]` 인자도 정상
-
-다섯 호스트 전부 `--nnodes=5`, 같은 `--rdzv-id`, 같은 `--rdzv_endpoint`입니다.
+다섯 호스트 전부 `[LAUNCH]` 인자가 동일합니다.
 
 ```
 --nnodes=5 --node_rank=N --rdzv-id=probe_31320_1787935247 --rdzv_endpoint=node26:29500
 ```
 
 `--nnodes=5`면 min=max=5라 **2노드로 완료될 수 없습니다.** 그런데 됐습니다.
-여기부터는 torch 내부를 봐야 합니다.
+성공한 것은 node_rank 0·1이고, 시작 순서와는 무관합니다(가장 늦게 시작한 노드가 성공).
 
-### rendezvous 로그가 안 나온 이유 — 제 버그
+### 이어서 볼 것
 
-`TORCH_DISTRIBUTED_DEBUG`와 `LOGLEVEL`이 **프로브의 전달 목록에 없었습니다.**
-셸에 설정해도 컨테이너까지 가지 않았습니다. 로그의 `env into container` 줄에도
-없습니다. 제가 전달되지 않는 변수를 알려드렸습니다. 추가했습니다.
-
-## 준비
-
-**`git pull` 필요** (`8b4defe`).
-
-```bash
-cd /mgmt/server/poc-platform/poc-platform-pub
-git pull
-
-echo "IMG=[$IMG] TAR=[$TAR]"     # 비어 있으면 조용히 죽습니다
-```
-
----
-
-## STEP 1 — rendezvous 내부 로그 (지금 할 일)
-
-**`git pull` 필요.** 이제 `TORCH_DISTRIBUTED_DEBUG`/`LOGLEVEL`이 컨테이너까지 갑니다.
+`TORCH_DISTRIBUTED_DEBUG`/`LOGLEVEL`이 프로브의 전달 목록에 없어 컨테이너까지 가지 않았습니다.
+`fadcb2a` 에서 고쳤으므로 이제 rendezvous 내부 로그를 받을 수 있습니다.
 
 ```bash
 TORCH_DISTRIBUTED_DEBUG=DETAIL LOGLEVEL=INFO \
-./scripts/nccl_probe.sh --hosts node26,node27,node28 \
-  --image $IMG 2>&1 | tee /mgmt/server/nccl_probe.log
+./scripts/nccl_probe.sh --hosts node26,node27,node28 --image $IMG 2>&1 | tee /tmp/rdzv.log
 ```
 
-먼저 이 줄로 **실제로 전달됐는지** 확인하세요.
+전달됐는지 먼저 확인: `[INFO] env into container: ... TORCH_DISTRIBUTED_DEBUG=DETAIL`
 
-```
-[INFO] env into container: ... TORCH_DISTRIBUTED_DEBUG=DETAIL LOGLEVEL=INFO
-```
-
-그다음 볼 것:
+그다음 이 두 줄에서 **`W`가 몇인지, `round` 번호가 노드마다 같은지**가 답입니다.
 
 ```
 The node 'xxx' has joined round N of the rendezvous 'yyy' as rank R of W
 Rendezvous complete for workers. Result: restart_count=... master_addr=...
 ```
 
-**`W`가 몇으로 나오는지, `round` 번호가 노드마다 같은지**가 답입니다.
-3노드로 좁혀서 돌리시면 로그를 끝까지 읽을 수 있습니다.
-
----
-
-## STEP 2 — 그래도 안 되면: 2노드
-
-여기까지 오면 torch가 뭘 하는지 직접 봐야 합니다.
-
-rank 0과 문제 노드 하나만 남겨서, 로그를 끝까지 읽을 수 있게 합니다.
-
-```bash
-TORCH_DISTRIBUTED_DEBUG=DETAIL LOGLEVEL=INFO \
-./scripts/nccl_probe.sh --hosts node26,node27 --image $IMG 2>&1 | tee /tmp/rdzv.log
-```
-
----
-
-## 배제된 것 (다시 볼 필요 없음)
+### 배제된 것 (다시 볼 필요 없음)
 
 | 가설 | 근거 |
 |---|---|
@@ -132,6 +138,7 @@ TORCH_DISTRIBUTED_DEBUG=DETAIL LOGLEVEL=INFO \
 | `npy_index` FileNotFound | 노드마다 다른 캐시 경로 | `5cbdc5b` |
 | 조용한 exit 1 | `$IMG` 미설정 → 값 없는 플래그 → `shift 2` 실패 | `521b198` |
 | 60초 join 절단 | `read_timeout`(기본 60s)을 안 건드렸음 | `fdaa5c6` |
+| step 로그가 `run.log`에 안 남음 | 컨테이너 출력을 tee 하지 않았음 | `42cc79f` |
 
 ---
 
@@ -151,7 +158,7 @@ world size 간 비교 가능) / `PER-HOST RESULT`(exit + 실패 사유) / `world
 
 ---
 
-## 실행 참고
+## 실행 참고 (CLI)
 
 `--gbs`는 **생략하세요.** 노드 수에서 파생됩니다(`MBS x DP x grad_accum`, 기본 128).
 1/2/4/8노드가 128/256/512/1024가 되어 GPU당 일이 일정하게 유지됩니다.
@@ -172,7 +179,8 @@ MLPERF_TRAIN_IMAGE_TAR=$TAR \
 
 | 항목 | 상태 |
 |---|---|
-| **멀티노드 rendezvous** | **미해결.** STEP 1 진행 중 |
+| 플랫폼 end-to-end 테스트 | **진행 중** (`docs/start-platform.md`) |
+| 멀티노드 rendezvous | 미해결. **다른 분께 인계** |
 | SHARP 부재 | B300은 HPC-X 플러그인을 끄므로 in-network reduction 없음. 정식 측정 전 결정 필요 |
 | 스케일링 측정 | 1/2/4/8 스텝 시간 비교 (미착수) |
 | llama2_70b_lora | B300에서 미실행 |
